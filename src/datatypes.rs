@@ -121,8 +121,23 @@ pub struct SysInfo {
 #[derive(Debug, Deserialize)]
 pub struct LightState {
     pub on_off: u8,
-    pub dft_on_state: DftOnState,
+    #[serde(rename = "dft_on_state")]
+    dft_off_on_state: Option<DftOnState>,
+    #[serde(flatten)]
+    dft_on_on_state: Option<DftOnState>,
     pub err_code: Option<ErrCode>,
+}
+
+impl LightState {
+    pub fn dft_on_state(&self) -> &DftOnState {
+        if let Some(dft_on_state) = &self.dft_off_on_state {
+            dft_on_state
+        } else if let Some(dft_on_state) = &self.dft_on_on_state {
+            dft_on_state
+        } else {
+            panic!("dft_on_state must be present in some way");
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -256,7 +271,7 @@ mod tests {
       }
     }"#;
 
-    const LB110_JSON_ON: &'static str = r#"{
+    const LB110_JSON_OFF: &'static str = r#"{
       "system": {
         "get_sysinfo": {
           "sw_ver": "1.8.6 Build 180809 Rel.091659",
@@ -354,7 +369,7 @@ mod tests {
       }
     }"#;
 
-    const LB110_JSON_OFF: &'static str = r#"{
+    const LB110_JSON_ON: &'static str = r#"{
       "system": {
         "get_sysinfo": {
           "sw_ver": "1.8.6 Build 180809 Rel.091659",
@@ -465,14 +480,27 @@ mod tests {
     }
 
     #[test]
-    fn deserialise_lb110() {
+    fn deserialise_lb110_off() {
+        let result = serde_json::from_str::<Device>(&LB110_JSON_OFF).unwrap();
+
+        assert_eq!(result.system.sysinfo.hw_ver, "1.0");
+        assert_eq!(result.system.sysinfo.model, "LB110(EU)");
+        assert_eq!(result.system.sysinfo.light_state.unwrap().dft_on_state().color_temp, 2700);
+        let smartlife = result.smartlife;
+        assert_eq!(smartlife.emeter.unwrap().realtime.power_mw, 0);
+        assert_eq!(smartlife.lightingservice.unwrap().light_state.dft_on_state().color_temp, 2700);
+    }
+
+    #[test]
+    fn deserialise_lb110_on() {
         let result = serde_json::from_str::<Device>(&LB110_JSON_ON).unwrap();
 
         assert_eq!(result.system.sysinfo.hw_ver, "1.0");
         assert_eq!(result.system.sysinfo.model, "LB110(EU)");
-        assert_eq!(result.system.sysinfo.light_state.unwrap().dft_on_state.color_temp, 2700);
+        assert_eq!(result.system.sysinfo.light_state.unwrap().dft_on_state().color_temp, 2700);
         let smartlife = result.smartlife;
-        assert_eq!(smartlife.emeter.unwrap().realtime.power_mw, 0);
-        assert_eq!(smartlife.lightingservice.unwrap().light_state.dft_on_state.color_temp, 2700);
+        assert_eq!(smartlife.emeter.unwrap().realtime.power_mw, 1800);
+        assert_eq!(smartlife.lightingservice.unwrap().light_state.dft_on_state().color_temp, 2700);
     }
+
 }
