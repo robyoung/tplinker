@@ -1,72 +1,108 @@
+use crate::error::{SectionError, Result, Error};
+
 type ErrCode = i16;
 
-#[derive(Debug, Deserialize)]
-pub struct Device {
+#[derive(Debug, Deserialize, Clone)]
+pub struct DeviceData {
     pub system: System,
-    pub emeter: SectionResult<Emeter>,
+    pub emeter: Option<SectionResult<Emeter>>,
     #[serde(flatten)]
     pub smartlife: Smartlife,
 }
 
-#[derive(Debug, Deserialize)]
+impl DeviceData {
+    pub fn sysinfo(self) -> SysInfo {
+        self.system.sysinfo
+    }
+
+    pub fn emeter(self) -> Result<Emeter> {
+        if let Some(emeter) = self.emeter {
+            match emeter {
+                SectionResult::Ok(emeter) => Ok(emeter),
+                SectionResult::Err(err) => Err(Error::from(err.clone())),
+            }
+        } else {
+            Err(Error::Other(String::from("No emeter present")))
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum SectionResult<T> {
     Ok(T),
     Err(SectionError),
-    None,
 }
 
 impl<T> SectionResult<T> {
     pub fn unwrap(self) -> T {
         match self {
             Self::Ok(section) => section,
-            Self::Err(_) | Self::None => panic!("expecting section"),
+            Self::Err(_) => panic!("expecting section"),
         }
     }
 }
 
-#[derive(Debug, Deserialize)]
-pub struct SectionError {
-    pub err_code: i16,
-    pub err_msg: String,
-}
-
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Smartlife {
     #[serde(rename = "smartlife.iot.dimmer")]
-    pub dimmer: SectionError,
+    pub dimmer: Option<SectionError>,
     #[serde(rename = "smartlife.iot.common.emeter")]
-    pub emeter: SectionResult<SmartlifeEmeter>,
+    pub emeter: Option<SectionResult<SmartlifeEmeter>>,
     #[serde(rename = "smartlife.iot.smartbulb.lightingservice")]
-    pub lightingservice: SectionResult<SmartlifeLightingService>,
+    pub lightingservice: Option<SectionResult<SmartlifeLightingService>>,
+}
+
+impl Smartlife {
+    pub fn emeter(&self) -> Result<&SmartlifeEmeter> {
+        if let Some(emeter) = &self.emeter {
+            match emeter {
+                SectionResult::Ok(emeter) => Ok(emeter),
+                SectionResult::Err(err) => Err(Error::from(err.clone())),
+            }
+        } else {
+            Err(Error::Other(String::from("No emeter present")))
+        }
+    }
+
+    pub fn lightingservice(&self) -> Result<&SmartlifeLightingService> {
+        if let Some(l) = &self.lightingservice {
+            match l {
+                SectionResult::Ok(l) => Ok(l),
+                SectionResult::Err(err) => Err(Error::from(err.clone()))
+            }
+        } else {
+            Err(Error::Other(String::from("No lighting service present")))
+        }
+    }
 }
 
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct SmartlifeEmeter {
     #[serde(rename = "get_realtime")]
     pub realtime: SmartlifeEmeterRealtime,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct SmartlifeEmeterRealtime {
     pub power_mw: u32,
     pub err_code: ErrCode,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct SmartlifeLightingService {
     #[serde(rename = "get_light_state")]
     pub light_state: LightState,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct System {
     #[serde(rename = "get_sysinfo")]
     pub sysinfo: SysInfo,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct SysInfo {
     // COMMON
     pub sw_ver: String,
@@ -102,8 +138,8 @@ pub struct SysInfo {
     pub led_off: Option<u8>,
 
     // HS100
-    pub longitude_i: Option<i64>,    // TODO: move out
-    pub latitude_i: Option<i64>,     // TODO: move out
+    pub longitude_i: Option<i32>,    // TODO: move out
+    pub latitude_i: Option<i32>,     // TODO: move out
     pub ntc_state: Option<u8>,       // TODO: what is this?
 
     // HS110
@@ -118,7 +154,7 @@ pub struct SysInfo {
     pub heapsize: Option<u64>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct LightState {
     pub on_off: u8,
     #[serde(rename = "dft_on_state")]
@@ -140,7 +176,7 @@ impl LightState {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct DftOnState {
     pub mode: String,
     pub hue: i32,
@@ -149,14 +185,14 @@ pub struct DftOnState {
     pub brightness: i32,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Emeter {
     #[serde(rename = "get_realtime")]
     pub realtime: SectionResult<EmeterRealtime>,
     // TODO: add other stats aggregations
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct EmeterRealtime {
     pub current: f64,
     pub voltage: f64,
@@ -167,10 +203,10 @@ pub struct EmeterRealtime {
 
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
 
-    const HS100_JSON: &'static str = r#"{
+    pub const HS100_JSON: &'static str = r#"{
       "system": {
         "get_sysinfo": {
           "sw_ver": "1.5.8 Build 180815 Rel.135935",
@@ -188,8 +224,8 @@ mod tests {
           "icon_hash": "",
           "rssi": -53,
           "led_off": 0,
-          "longitude_i": 0,
-          "latitude_i": 0,
+          "longitude_i": 123,
+          "latitude_i": 3456,
           "hwId": "00000000000000000000000000000000",
           "fwId": "00000000000000000000000000000000",
           "deviceId": "0000000000000000000000000000000000000000",
@@ -465,42 +501,46 @@ mod tests {
 
     #[test]
     fn deserialise_hs100() {
-        let result = serde_json::from_str::<Device>(&HS100_JSON).unwrap();
+        let result = serde_json::from_str::<DeviceData>(&HS100_JSON).unwrap();
 
-        assert_eq!(result.system.sysinfo.hw_ver, "2.1");
-        assert_eq!(result.system.sysinfo.model, "HS100(UK)");
+        let sysinfo = result.sysinfo();
+        assert_eq!(sysinfo.hw_ver, "2.1");
+        assert_eq!(sysinfo.model, "HS100(UK)");
     }
 
     #[test]
     fn deserialise_hs110() {
-        let result = serde_json::from_str::<Device>(&HS110_JSON).unwrap();
+        let result = serde_json::from_str::<DeviceData>(&HS110_JSON).unwrap();
 
-        assert_eq!(result.system.sysinfo.hw_ver, "1.0");
-        assert_eq!(result.system.sysinfo.model, "HS110(UK)");
+        let sysinfo = result.sysinfo();
+        assert_eq!(sysinfo.hw_ver, "1.0");
+        assert_eq!(sysinfo.model, "HS110(UK)");
     }
 
     #[test]
     fn deserialise_lb110_off() {
-        let result = serde_json::from_str::<Device>(&LB110_JSON_OFF).unwrap();
+        let result = serde_json::from_str::<DeviceData>(&LB110_JSON_OFF).unwrap();
 
-        assert_eq!(result.system.sysinfo.hw_ver, "1.0");
-        assert_eq!(result.system.sysinfo.model, "LB110(EU)");
-        assert_eq!(result.system.sysinfo.light_state.unwrap().dft_on_state().color_temp, 2700);
+        let sysinfo = result.clone().sysinfo();
+        assert_eq!(sysinfo.hw_ver, "1.0");
+        assert_eq!(sysinfo.model, "LB110(EU)");
+        assert_eq!(sysinfo.light_state.as_ref().unwrap().dft_on_state().color_temp, 2700);
         let smartlife = result.smartlife;
-        assert_eq!(smartlife.emeter.unwrap().realtime.power_mw, 0);
-        assert_eq!(smartlife.lightingservice.unwrap().light_state.dft_on_state().color_temp, 2700);
+        assert_eq!(smartlife.emeter().unwrap().realtime.power_mw, 0);
+        assert_eq!(smartlife.lightingservice().unwrap().light_state.dft_on_state().color_temp, 2700);
     }
 
     #[test]
     fn deserialise_lb110_on() {
-        let result = serde_json::from_str::<Device>(&LB110_JSON_ON).unwrap();
+        let result = serde_json::from_str::<DeviceData>(&LB110_JSON_ON).unwrap();
 
-        assert_eq!(result.system.sysinfo.hw_ver, "1.0");
-        assert_eq!(result.system.sysinfo.model, "LB110(EU)");
-        assert_eq!(result.system.sysinfo.light_state.unwrap().dft_on_state().color_temp, 2700);
+        let sysinfo = result.clone().sysinfo();
+        assert_eq!(sysinfo.hw_ver, "1.0");
+        assert_eq!(sysinfo.model, "LB110(EU)");
+        assert_eq!(sysinfo.light_state.as_ref().unwrap().dft_on_state().color_temp, 2700);
         let smartlife = result.smartlife;
-        assert_eq!(smartlife.emeter.unwrap().realtime.power_mw, 1800);
-        assert_eq!(smartlife.lightingservice.unwrap().light_state.dft_on_state().color_temp, 2700);
+        assert_eq!(smartlife.emeter().unwrap().realtime.power_mw, 1800);
+        assert_eq!(smartlife.lightingservice().unwrap().light_state.dft_on_state().color_temp, 2700);
     }
 
 }

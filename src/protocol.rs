@@ -1,12 +1,15 @@
-use byteorder::{BigEndian, WriteBytesExt};
-
 use std::{
     io::{Read, Write},
-    net::TcpStream,
+    net::{TcpStream, SocketAddr},
     time::Duration,
 };
 
+use byteorder::{BigEndian, WriteBytesExt};
+
 use crate::error::Error;
+
+#[cfg(test)]
+use std::cell::Cell;
 
 // Prepare and encrypt message to send to the device
 // see: https://www.softscheck.com/en/reverse-engineering-tp-link-hs110/
@@ -48,17 +51,68 @@ pub fn decrypt(cipher: &mut [u8]) -> String {
     String::from_utf8_lossy(cipher).into_owned()
 }
 
-pub fn send(ip: &str, msg: &str) -> Result<String, Error> {
-    let payload = encrypt(msg)?;
-    let mut stream = TcpStream::connect(ip)?;
+pub trait Protocol {
+    fn send(&self, ip: SocketAddr, msg: &str) -> Result<String, Error>;
+}
 
-    stream.set_read_timeout(Some(Duration::new(5, 0)))?;
-    stream.write_all(&payload)?;
+pub struct DefaultProtocol;
 
-    let mut resp = vec![];
-    stream.read_to_end(&mut resp)?;
+impl DefaultProtocol {
+    pub fn new() -> DefaultProtocol {
+        DefaultProtocol {}
+    }
+}
 
-    Ok(decrypt(&mut resp.split_off(4)))
+impl Protocol for DefaultProtocol {
+    fn send(&self, ip: SocketAddr, msg: &str) -> Result<String, Error> {
+        let payload = encrypt(msg)?;
+        println!("send: {:?}", ip);
+        let mut stream = TcpStream::connect(ip)?;
+        println!("send connected");
+
+        stream.set_read_timeout(Some(Duration::new(5, 0)))?;
+        println!("send option set");
+        stream.write_all(&payload)?;
+        println!("send written");
+
+        let mut resp = vec![];
+        stream.read_to_end(&mut resp)?;
+        println!("send read");
+
+        let decrypted = decrypt(&mut resp.split_off(4));
+
+        println!("{}", decrypted);
+
+        Ok(decrypted)
+    }
+}
+
+#[cfg(test)]
+pub struct ProtocolMock {
+    req: Cell<Option<(String, String)>>,
+    resp: Cell<Result<String, Error>>,
+}
+
+#[cfg(test)]
+impl ProtocolMock {
+    pub fn new() -> ProtocolMock {
+        ProtocolMock {
+            req: Cell::new(None),
+            resp: Cell::new(Ok(String::from(""))),
+        }
+    }
+
+    pub fn set_send_return_value(&self, resp: Result<String, Error>) {
+        self.resp.set(resp);
+    }
+}
+
+#[cfg(test)]
+impl Protocol for ProtocolMock {
+    fn send(&self, ip: SocketAddr, msg: &str) -> Result<String, Error> {
+        self.req.set(Some((ip.to_string(), msg.to_string())));
+        self.resp.replace(Ok(String::from("")))
+    }
 }
 
 #[cfg(test)]
