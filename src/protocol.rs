@@ -1,10 +1,11 @@
 use std::{
+    convert::TryInto,
     io::{Read, Write},
     net::{TcpStream, SocketAddr},
     time::Duration,
 };
 
-use byteorder::{BigEndian, WriteBytesExt};
+use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
 
 use crate::error::Error;
 
@@ -66,22 +67,29 @@ impl DefaultProtocol {
 impl Protocol for DefaultProtocol {
     fn send(&self, ip: SocketAddr, msg: &str) -> Result<String, Error> {
         let payload = encrypt(msg)?;
-        println!("send: {:?}", ip);
         let mut stream = TcpStream::connect(ip)?;
-        println!("send connected");
 
         stream.set_read_timeout(Some(Duration::new(5, 0)))?;
-        println!("send option set");
         stream.write_all(&payload)?;
-        println!("send written");
 
         let mut resp = vec![];
-        stream.read_to_end(&mut resp)?;
-        println!("send read");
+        let mut buffer: [u8; 4096] = [0; 4096];
+        let mut length: Option<u32> = None;
+
+        loop {
+            if let Ok(read) = stream.read(&mut buffer) {
+                if length.is_none() {
+                    length = Some(BigEndian::read_u32(&buffer[0..4]));
+                }
+                resp.extend_from_slice(&buffer[0..read]);
+                let lval: u32 = length.unwrap();
+                if lval > 0 && resp.len() >= (lval + 4).try_into().unwrap() || read == 0 {
+                    break;
+                }
+            }
+        }
 
         let decrypted = decrypt(&mut resp.split_off(4));
-
-        println!("{}", decrypted);
 
         Ok(decrypted)
     }
