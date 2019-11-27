@@ -92,7 +92,7 @@ struct RawDevice {
 impl RawDevice {
     pub fn new(ip: SocketAddr) -> RawDevice {
         RawDevice {
-            ip: ip,
+            ip,
             protocol: Box::new(DefaultProtocol::new()),
         }
     }
@@ -136,14 +136,14 @@ impl DeviceSwitch for HS100 {
 
     fn switch_off(&self) -> Result<()> {
         // TODO: investigate a command helper
-        let command = format!(r#"{{"system":{{"set_relay_state":{{"state": 0}}}}}}"#);
+        let command = r#"{{"system":{{"set_relay_state":{{"state": 0}}}}}}"#;
         self.submit(&command)?;
         Ok(())
     }
 
     fn switch_on(&self) -> Result<()> {
         // TODO: investigate a command helper
-        let command = format!(r#"{{"system":{{"set_relay_state":{{"state": 1}}}}}}"#);
+        let command = r#"{{"system":{{"set_relay_state":{{"state": 1}}}}}}"#;
         self.submit(&command)?;
         Ok(())
     }
