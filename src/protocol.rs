@@ -1,7 +1,7 @@
 use std::{
     convert::TryInto,
     io::{Read, Write},
-    net::{TcpStream, SocketAddr},
+    net::{SocketAddr, TcpStream},
     time::Duration,
 };
 

@@ -1,12 +1,9 @@
-use std::{
-    time::Duration,
-    net::SocketAddr,
-};
 use crate::{
-    protocol::{Protocol, DefaultProtocol},
     datatypes::{DeviceData, SysInfo},
     error::{Error, Result},
+    protocol::{DefaultProtocol, Protocol},
 };
+use std::{net::SocketAddr, time::Duration};
 
 // CAPABILITIES
 
@@ -29,7 +26,10 @@ pub trait Device {
 
     fn set_alias(&self, alias: &str) -> Result<()> {
         // TODO: investigate a command helper
-        let command = format!(r#"{{"system":{{"set_dev_alias": {{"alias": {}}}}}}}"#, alias);
+        let command = format!(
+            r#"{{"system":{{"set_dev_alias": {{"alias": {}}}}}}}"#,
+            alias
+        );
         self.submit(&command)?;
         Ok(())
     }
@@ -38,7 +38,9 @@ pub trait Device {
         let sysinfo = self.sysinfo()?;
         if let (Some(latitude), Some(longitude)) = (sysinfo.latitude, sysinfo.longitude) {
             Ok((latitude, longitude))
-        } else if let (Some(latitude_i), Some(longitude_i)) = (sysinfo.latitude_i, sysinfo.longitude_i) {
+        } else if let (Some(latitude_i), Some(longitude_i)) =
+            (sysinfo.latitude_i, sysinfo.longitude_i)
+        {
             Ok((f64::from(latitude_i), f64::from(longitude_i)))
         } else {
             Err(Error::Other(String::from("Complete coordinates not found")))
@@ -46,17 +48,20 @@ pub trait Device {
     }
 
     fn reboot(&self) -> Result<()> {
-        self.reboot_with_delay(Duration::from_secs(1))    
+        self.reboot_with_delay(Duration::from_secs(1))
     }
 
     fn reboot_with_delay(&self, delay: Duration) -> Result<()> {
-        let command = format!(r#"{{"system":{{"reboot":{{"delay": {}}}}}}}"#, delay.as_secs());
+        let command = format!(
+            r#"{{"system":{{"reboot":{{"delay": {}}}}}}}"#,
+            delay.as_secs()
+        );
         self.submit(&command)?;
         Ok(())
     }
 }
 
-pub trait DeviceSwitch : Device {
+pub trait DeviceSwitch: Device {
     fn is_on(&self) -> Result<bool>;
 
     fn is_off(&self) -> Result<bool> {
@@ -86,13 +91,18 @@ struct RawDevice {
 
 impl RawDevice {
     pub fn new(ip: SocketAddr) -> RawDevice {
-        RawDevice { ip: ip, protocol: Box::new(DefaultProtocol::new()) }
+        RawDevice {
+            ip: ip,
+            protocol: Box::new(DefaultProtocol::new()),
+        }
     }
 }
 
 impl Device for RawDevice {
     fn submit(&self, msg: &str) -> Result<DeviceData> {
-        Ok(serde_json::from_str::<DeviceData>(&self.protocol.send(self.ip, msg)?)?)
+        Ok(serde_json::from_str::<DeviceData>(
+            &self.protocol.send(self.ip, msg)?,
+        )?)
     }
 }
 
@@ -103,7 +113,9 @@ pub struct HS100 {
 
 impl HS100 {
     pub fn new(ip: SocketAddr) -> HS100 {
-        HS100 { raw: RawDevice::new(ip) }
+        HS100 {
+            raw: RawDevice::new(ip),
+        }
     }
 }
 
@@ -135,15 +147,13 @@ impl DeviceSwitch for HS100 {
         self.submit(&command)?;
         Ok(())
     }
-
 }
-
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::protocol::ProtocolMock;
     use crate::datatypes::tests::HS100_JSON;
+    use crate::protocol::ProtocolMock;
 
     #[test]
     fn test_raw_device_submit_success() {
@@ -185,5 +195,4 @@ mod tests {
 
         assert_eq!((3456.0, 123.0), device.location().unwrap());
     }
-
 }

@@ -1,14 +1,10 @@
 use std::{
     collections::HashMap,
-    net::{UdpSocket, SocketAddr},
+    net::{SocketAddr, UdpSocket},
     time::Duration,
 };
 
-use crate::{
-    protocol,
-    datatypes,
-    error::{Result},
-};
+use crate::{datatypes, error::Result, protocol};
 
 // TODO: consider moving this to query builder
 const QUERY: &'static str = r#"{

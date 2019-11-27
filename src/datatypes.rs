@@ -1,4 +1,4 @@
-use crate::error::{SectionError, Result, Error};
+use crate::error::{Error, Result, SectionError};
 
 type ErrCode = i16;
 
@@ -69,14 +69,13 @@ impl Smartlife {
         if let Some(l) = &self.lightingservice {
             match l {
                 SectionResult::Ok(l) => Ok(l),
-                SectionResult::Err(err) => Err(Error::from(err.clone()))
+                SectionResult::Err(err) => Err(Error::from(err.clone())),
             }
         } else {
             Err(Error::Other(String::from("No lighting service present")))
         }
     }
 }
-
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct SmartlifeEmeter {
@@ -112,7 +111,7 @@ pub struct SysInfo {
     pub hw_type: String,
     pub model: String,
     #[serde(alias = "mic_mac")]
-    pub mac: String,           // TODO: move out alt mic_mac
+    pub mac: String, // TODO: move out alt mic_mac
     #[serde(rename = "deviceId")]
     pub device_id: String,
     #[serde(rename = "hwId")]
@@ -122,7 +121,7 @@ pub struct SysInfo {
     pub alias: String,
     #[serde(alias = "description")]
     pub dev_name: String,
-    pub err_code: ErrCode,       // TODO: how small can I go?
+    pub err_code: ErrCode,   // TODO: how small can I go?
     pub rssi: i64,           // TODO: could this be smaller
     pub active_mode: String, // TODO: Could be enum
 
@@ -132,19 +131,19 @@ pub struct SysInfo {
     pub fw_id: Option<String>,
     pub relay_state: Option<u8>,
     pub on_time: Option<i64>,
-    pub feature: Option<String>,     // TODO: Could be enum
+    pub feature: Option<String>, // TODO: Could be enum
     pub updating: Option<u8>,
     pub icon_hash: Option<String>,
     pub led_off: Option<u8>,
 
     // HS100
-    pub longitude_i: Option<i32>,    // TODO: move out
-    pub latitude_i: Option<i32>,     // TODO: move out
-    pub ntc_state: Option<u8>,       // TODO: what is this?
+    pub longitude_i: Option<i32>, // TODO: move out
+    pub latitude_i: Option<i32>,  // TODO: move out
+    pub ntc_state: Option<u8>,    // TODO: what is this?
 
     // HS110
-    pub longitude: Option<f64>,    // TODO: move out
-    pub latitude: Option<f64>,     // TODO: move out
+    pub longitude: Option<f64>, // TODO: move out
+    pub latitude: Option<f64>,  // TODO: move out
 
     // LB110
     pub light_state: Option<LightState>,
@@ -200,7 +199,6 @@ pub struct EmeterRealtime {
     pub total: f64,
     pub err_code: ErrCode,
 }
-
 
 #[cfg(test)]
 pub mod tests {
@@ -524,10 +522,26 @@ pub mod tests {
         let sysinfo = result.clone().sysinfo();
         assert_eq!(sysinfo.hw_ver, "1.0");
         assert_eq!(sysinfo.model, "LB110(EU)");
-        assert_eq!(sysinfo.light_state.as_ref().unwrap().dft_on_state().color_temp, 2700);
+        assert_eq!(
+            sysinfo
+                .light_state
+                .as_ref()
+                .unwrap()
+                .dft_on_state()
+                .color_temp,
+            2700
+        );
         let smartlife = result.smartlife;
         assert_eq!(smartlife.emeter().unwrap().realtime.power_mw, 0);
-        assert_eq!(smartlife.lightingservice().unwrap().light_state.dft_on_state().color_temp, 2700);
+        assert_eq!(
+            smartlife
+                .lightingservice()
+                .unwrap()
+                .light_state
+                .dft_on_state()
+                .color_temp,
+            2700
+        );
     }
 
     #[test]
@@ -537,10 +551,25 @@ pub mod tests {
         let sysinfo = result.clone().sysinfo();
         assert_eq!(sysinfo.hw_ver, "1.0");
         assert_eq!(sysinfo.model, "LB110(EU)");
-        assert_eq!(sysinfo.light_state.as_ref().unwrap().dft_on_state().color_temp, 2700);
+        assert_eq!(
+            sysinfo
+                .light_state
+                .as_ref()
+                .unwrap()
+                .dft_on_state()
+                .color_temp,
+            2700
+        );
         let smartlife = result.smartlife;
         assert_eq!(smartlife.emeter().unwrap().realtime.power_mw, 1800);
-        assert_eq!(smartlife.lightingservice().unwrap().light_state.dft_on_state().color_temp, 2700);
+        assert_eq!(
+            smartlife
+                .lightingservice()
+                .unwrap()
+                .light_state
+                .dft_on_state()
+                .color_temp,
+            2700
+        );
     }
-
 }

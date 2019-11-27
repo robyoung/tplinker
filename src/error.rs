@@ -1,11 +1,5 @@
-use std::{
-    fmt,
-    error,
-    io,
-    convert::From,
-    result,
-};
 use serde_json;
+use std::{convert::From, error, fmt, io, result};
 
 #[derive(Debug)]
 pub enum Error {
@@ -20,7 +14,10 @@ impl fmt::Display for Error {
         match self {
             Error::IO(_) => f.write_str("Error connecting to the device"),
             Error::Serde(_) => f.write_str("Could not parse the response received from the device"),
-            Error::TPLink(err) => f.write_str(&format!("Response data error: ({}) {}", err.err_code, err.err_msg)),
+            Error::TPLink(err) => f.write_str(&format!(
+                "Response data error: ({}) {}",
+                err.err_code, err.err_msg
+            )),
             Error::Other(err) => f.write_str(&err),
         }
     }
@@ -62,7 +59,6 @@ impl From<SectionError> for Error {
 }
 
 pub type Result<T> = result::Result<T, Error>;
-
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct SectionError {
