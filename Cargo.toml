@@ -3,6 +3,11 @@ name = "tplinker"
 version = "0.1.0"
 authors = ["Rob Young <rob@robyoung.digital>"]
 edition = "2018"
+license = "MIT"
+readme = "README.md"
+keywords = ["HS100", "HS110", "LB110", "TPLink"]
+categories = ["api-bindings"]
+
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

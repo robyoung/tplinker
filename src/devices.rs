@@ -3,7 +3,11 @@ use crate::{
     error::{Error, Result},
     protocol::{DefaultProtocol, Protocol},
 };
-use std::{net::SocketAddr, time::Duration};
+use std::{
+    net::{SocketAddr, AddrParseError},
+    str::FromStr,
+    time::Duration,
+};
 
 // CAPABILITIES
 
@@ -112,7 +116,12 @@ pub struct HS100 {
 }
 
 impl HS100 {
-    pub fn new(ip: SocketAddr) -> HS100 {
+    // TODO: improve instantiation
+    pub fn new(ip: &str) -> std::result::Result<HS100, AddrParseError> {
+        Ok(Self::from_addr(SocketAddr::from_str(ip)?))
+    }
+
+    pub fn from_addr(ip: SocketAddr) -> HS100 {
         HS100 {
             raw: RawDevice::new(ip),
         }
