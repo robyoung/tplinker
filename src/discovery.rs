@@ -4,7 +4,7 @@ use std::{
     time::Duration,
 };
 
-use crate::{datatypes, error::Result, protocol};
+use crate::{datatypes::DeviceData, error::Result, protocol};
 
 // TODO: consider moving this to query builder
 const QUERY: &str = r#"{
@@ -15,7 +15,7 @@ const QUERY: &str = r#"{
     "smartlife.iot.smartbulb.lightingservice": {"get_light_state": null}
 }"#;
 
-pub fn discover() -> Result<HashMap<SocketAddr, datatypes::DeviceData>> {
+pub fn discover() -> Result<Vec<(SocketAddr, DeviceData)>> {
     let socket = UdpSocket::bind("0.0.0.0:0")?;
     socket.set_broadcast(true)?;
     socket.set_read_timeout(Some(Duration::from_secs(3)))?;
@@ -31,10 +31,10 @@ pub fn discover() -> Result<HashMap<SocketAddr, datatypes::DeviceData>> {
     let mut devices = HashMap::new();
     while let Ok((size, addr)) = socket.recv_from(&mut buf) {
         let data = protocol::decrypt(&mut buf[0..size]);
-        if let Ok(device) = serde_json::from_str::<datatypes::DeviceData>(&data) {
-            devices.insert(addr, device);
+        if let Ok(device_data) = serde_json::from_str::<DeviceData>(&data) {
+            devices.insert(addr, device_data);
         }
     }
 
-    Ok(devices)
+    Ok(devices.into_iter().collect())
 }

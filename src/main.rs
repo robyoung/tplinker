@@ -1,8 +1,7 @@
 extern crate tplinker;
 
-use std::net::SocketAddr;
 use tplinker::{
-    devices::{Device, HS100},
+    devices::{Device, DeviceActions, Switch, HS100},
     discovery::discover,
 };
 
@@ -11,9 +10,14 @@ fn pad(value: &str, padding: usize) -> String {
     format!("{}{}", value, pad)
 }
 
+fn switch_on(device: &dyn Switch) {
+    device.switch_on().unwrap();
+}
+
 fn main() {
-    for (addr, device) in discover().unwrap() {
-        let sysinfo = device.sysinfo();
+    for (addr, data) in discover().unwrap() {
+        let device = Device::from_data(addr, &data);
+        let sysinfo = data.sysinfo();
         println!(
             "{}\t{}\t{}\t{}\t{}",
             addr,
@@ -22,10 +26,15 @@ fn main() {
             pad(&sysinfo.dev_name, 40),
             sysinfo.model,
         );
+        match device {
+            Device::HS100(device) => switch_on(&device),
+            Device::HS110(device) => switch_on(&device),
+            Device::LB110(device) => switch_on(&device),
+            _ => println!("{} not switchable", sysinfo.alias),
+        }
     }
 
-    let host: SocketAddr = "192.168.0.10:9999".parse().unwrap();
-    let device = HS100::from_addr(host);
+    let device = HS100::new("192.168.0.10:9999").unwrap();
 
     println!("{:?}", device.sysinfo().unwrap());
 }

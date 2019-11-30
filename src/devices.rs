@@ -4,20 +4,16 @@ use crate::{
     protocol::{DefaultProtocol, Protocol},
 };
 use std::{
-    net::{SocketAddr, AddrParseError},
+    net::{AddrParseError, SocketAddr},
+    result,
     str::FromStr,
     time::Duration,
 };
 
-// CAPABILITIES
-
-pub trait Device {
+// TODO: move things around as private items are visible to sub-modules
+pub trait DeviceActions {
     /// Send a message to a device and return its parsed response
     fn submit(&self, msg: &str) -> Result<DeviceData>;
-
-    fn capabilities(&self) -> Vec<String> {
-        vec![String::from("Device")]
-    }
 
     fn sysinfo(&self) -> Result<SysInfo> {
         let device_data = self.submit(r#"{"system":{"get_sysinfo":null}}"#)?;
@@ -65,15 +61,28 @@ pub trait Device {
     }
 }
 
-pub trait DeviceSwitch: Device {
-    fn is_on(&self) -> Result<bool>;
+pub trait Switch: DeviceActions {
+    fn is_on(&self) -> Result<bool> {
+        if let Some(relay_state) = self.sysinfo()?.relay_state {
+            Ok(relay_state > 0)
+        } else {
+            Err(Error::Other(String::from("No relay state")))
+        }
+    }
 
     fn is_off(&self) -> Result<bool> {
         Ok(!self.is_on()?)
     }
 
-    fn switch_on(&self) -> Result<()>;
-    fn switch_off(&self) -> Result<()>;
+    fn switch_on(&self) -> Result<()> {
+        self.submit(&r#"{"system":{"set_relay_state":{"state": 1}}}"#)?;
+        Ok(())
+    }
+
+    fn switch_off(&self) -> Result<()> {
+        self.submit(&r#"{{"system":{{"set_relay_state":{{"state": 0}}}}}}"#)?;
+        Ok(())
+    }
 
     fn toggle(&self) -> Result<bool> {
         if self.is_on()? {
@@ -86,75 +95,109 @@ pub trait DeviceSwitch: Device {
     }
 }
 
+pub trait Light: DeviceActions {}
+
+pub trait Dimmer: Light {}
+
+pub trait Colour: Light {}
+
+pub trait Emeter: DeviceActions {}
+
 // DEVICES
 
-struct RawDevice {
-    ip: SocketAddr,
+pub struct RawDevice {
+    addr: SocketAddr,
     protocol: Box<dyn Protocol>,
 }
 
 impl RawDevice {
-    pub fn new(ip: SocketAddr) -> RawDevice {
-        RawDevice {
-            ip,
+    pub fn new(addr: &str) -> result::Result<RawDevice, AddrParseError> {
+        Ok(Self {
+            addr: SocketAddr::from_str(addr)?,
+            protocol: Box::new(DefaultProtocol::new()),
+        })
+    }
+
+    pub fn from_addr(addr: SocketAddr) -> Self {
+        Self {
+            addr,
             protocol: Box::new(DefaultProtocol::new()),
         }
     }
 }
 
-impl Device for RawDevice {
+impl DeviceActions for RawDevice {
     fn submit(&self, msg: &str) -> Result<DeviceData> {
         Ok(serde_json::from_str::<DeviceData>(
-            &self.protocol.send(self.ip, msg)?,
+            &self.protocol.send(self.addr, msg)?,
         )?)
     }
 }
 
+macro_rules! new_device {
+    ( $x:ident ) => {
+        pub struct $x {
+            raw: RawDevice,
+        }
+
+        impl $x {
+            pub fn new(addr: &str) -> std::result::Result<Self, AddrParseError> {
+                Ok(Self {
+                    raw: RawDevice::new(addr)?,
+                })
+            }
+
+            pub fn from_addr(addr: SocketAddr) -> Self {
+                Self {
+                    raw: RawDevice::from_addr(addr),
+                }
+            }
+        }
+
+        impl DeviceActions for $x {
+            fn submit(&self, msg: &str) -> Result<DeviceData> {
+                self.raw.submit(msg)
+            }
+        }
+    };
+}
+
 // TODO: should it be HS110 and HS100 or simply SmartPlug like in pyhs100?
-pub struct HS100 {
-    raw: RawDevice,
+// TODO: create a declarative macro to generate device structs with constructors
+new_device!(HS100);
+
+impl Switch for HS100 {}
+
+new_device!(HS110);
+
+impl Switch for HS110 {}
+impl Emeter for HS110 {}
+
+new_device!(LB110);
+
+impl Switch for LB110 {}
+impl Light for LB110 {}
+impl Dimmer for LB110 {}
+
+pub enum Device {
+    HS100(HS100),
+    HS110(HS110),
+    LB110(LB110),
+    Unknown(RawDevice),
 }
 
-impl HS100 {
-    // TODO: improve instantiation
-    pub fn new(ip: &str) -> std::result::Result<HS100, AddrParseError> {
-        Ok(Self::from_addr(SocketAddr::from_str(ip)?))
-    }
-
-    pub fn from_addr(ip: SocketAddr) -> HS100 {
-        HS100 {
-            raw: RawDevice::new(ip),
-        }
-    }
-}
-
-impl Device for HS100 {
-    fn submit(&self, msg: &str) -> Result<DeviceData> {
-        self.raw.submit(msg)
-    }
-}
-
-impl DeviceSwitch for HS100 {
-    fn is_on(&self) -> Result<bool> {
-        if let Some(relay_state) = self.sysinfo()?.relay_state {
-            Ok(relay_state > 0)
+impl Device {
+    pub fn from_data(addr: SocketAddr, device_data: &DeviceData) -> Device {
+        let model = device_data.system.sysinfo.model.clone();
+        if model.contains("HS100") {
+            Device::HS100(HS100::from_addr(addr))
+        } else if model.contains("HS100") {
+            Device::HS110(HS110::from_addr(addr))
+        } else if model.contains("LB110") {
+            Device::LB110(LB110::from_addr(addr))
         } else {
-            Err(Error::Other(String::from("No relay state")))
+            Device::Unknown(RawDevice::from_addr(addr))
         }
-    }
-
-    fn switch_off(&self) -> Result<()> {
-        // TODO: investigate a command helper
-        let command = r#"{{"system":{{"set_relay_state":{{"state": 0}}}}}}"#;
-        self.submit(&command)?;
-        Ok(())
-    }
-
-    fn switch_on(&self) -> Result<()> {
-        // TODO: investigate a command helper
-        let command = r#"{{"system":{{"set_relay_state":{{"state": 1}}}}}}"#;
-        self.submit(&command)?;
-        Ok(())
     }
 }
 
@@ -170,7 +213,7 @@ mod tests {
         let protocol = ProtocolMock::new();
         protocol.set_send_return_value(Ok(String::from(HS100_JSON)));
         let device = RawDevice {
-            ip: "0.0.0.0:9999".parse().unwrap(),
+            addr: "0.0.0.0:9999".parse().unwrap(),
             protocol: Box::new(protocol),
         };
 
@@ -186,7 +229,7 @@ mod tests {
         let protocol = ProtocolMock::new();
         protocol.set_send_return_value(Ok(String::from("invalid")));
         let device = RawDevice {
-            ip: "0.0.0.0:9999".parse().unwrap(),
+            addr: "0.0.0.0:9999".parse().unwrap(),
             protocol: Box::new(protocol),
         };
 
@@ -198,7 +241,7 @@ mod tests {
         let protocol = ProtocolMock::new();
         protocol.set_send_return_value(Ok(String::from(HS100_JSON)));
         let device = RawDevice {
-            ip: "0.0.0.0:9999".parse().unwrap(),
+            addr: "0.0.0.0:9999".parse().unwrap(),
             protocol: Box::new(protocol),
         };
 
