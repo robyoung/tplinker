@@ -25,6 +25,18 @@ impl DeviceData {
             Err(Error::Other(String::from("No emeter present")))
         }
     }
+
+    pub fn light_state(self) -> Result<LightState> {
+        if let Some(lightingservice) = self.smartlife.lightingservice {
+            return match lightingservice {
+                SectionResult::Ok(lightingservice) => Ok(lightingservice.light_state),
+                SectionResult::Err(err) => Err(Error::from(err.clone())),
+            };
+        } else if let Some(light_state) = self.system.sysinfo.light_state {
+            return Ok(light_state);
+        }
+        Err(Error::Other(String::from("No light state")))
+    }
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -41,6 +53,50 @@ impl<T> SectionResult<T> {
             Self::Err(_) => panic!("expecting section"),
         }
     }
+}
+
+// TODO: rename structs to be consistent, Result for top level results
+#[derive(Clone, Deserialize, Debug)]
+pub struct TransitionLightStateResult {
+    #[serde(rename = "smartlife.iot.smartbulb.lightingservice")]
+    pub lightingservice: SectionResult<TransitionLightState>,
+}
+
+impl TransitionLightStateResult {
+    pub fn light_state(self) -> Result<LightState> {
+        match self.lightingservice {
+            SectionResult::Ok(light_state) => Ok(light_state.light_state),
+            SectionResult::Err(err) => Err(Error::from(err.clone())),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct TransitionLightState {
+    #[serde(rename = "transition_light_state")]
+    pub light_state: LightState,
+}
+
+#[derive(Clone, Deserialize, Debug)]
+pub struct GetLightStateResult {
+    #[serde(rename = "smartlife.iot.smartbulb.lightingservice")]
+    pub lightingservice: SectionResult<GetLightState>,
+}
+
+impl GetLightStateResult {
+    pub fn light_state(self) -> Result<LightState> {
+        match self.lightingservice {
+            SectionResult::Ok(light_state) => Ok(light_state.light_state),
+            SectionResult::Err(err) => Err(Error::from(err.clone())),
+        }
+    }
+}
+
+#[derive(Clone, Deserialize, Debug)]
+pub struct GetLightState {
+    // TODO: investigate merging with previous
+    #[serde(rename = "get_light_state")]
+    pub light_state: LightState,
 }
 
 #[derive(Debug, Deserialize, Clone)]

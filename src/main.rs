@@ -1,7 +1,7 @@
 extern crate tplinker;
 
 use tplinker::{
-    devices::{Device, DeviceActions, Switch, HS100},
+    devices::{Device, DeviceActions, Switch, LB110},
     discovery::discover,
 };
 
@@ -10,8 +10,8 @@ fn pad(value: &str, padding: usize) -> String {
     format!("{}{}", value, pad)
 }
 
-fn switch_on(device: &dyn Switch) {
-    device.switch_on().unwrap();
+fn is_on<T: Switch>(device: &T) {
+    println!("{:?}", device.is_on());
 }
 
 fn main() {
@@ -27,14 +27,16 @@ fn main() {
             sysinfo.model,
         );
         match device {
-            Device::HS100(device) => switch_on(&device),
-            Device::HS110(device) => switch_on(&device),
-            Device::LB110(device) => switch_on(&device),
+            Device::HS100(device) => is_on(&device),
+            Device::HS110(device) => is_on(&device),
+            Device::LB110(device) => is_on(&device),
             _ => println!("{} not switchable", sysinfo.alias),
         }
     }
 
-    let device = HS100::new("192.168.0.10:9999").unwrap();
+    let device = LB110::new("192.168.0.25:9999").unwrap();
 
     println!("{:?}", device.sysinfo().unwrap());
+    println!("{:?}", device.is_on());
+    device.switch_on().unwrap();
 }

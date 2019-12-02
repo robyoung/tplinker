@@ -1,8 +1,9 @@
 use crate::{
-    datatypes::{DeviceData, SysInfo},
+    datatypes::{DeviceData, SysInfo, GetLightStateResult, LightState},
     error::{Error, Result},
     protocol::{DefaultProtocol, Protocol},
 };
+use serde::de::DeserializeOwned;
 use std::{
     net::{AddrParseError, SocketAddr},
     result,
@@ -13,11 +14,12 @@ use std::{
 // TODO: move things around as private items are visible to sub-modules
 pub trait DeviceActions {
     /// Send a message to a device and return its parsed response
-    fn submit(&self, msg: &str) -> Result<DeviceData>;
+    fn send<T: DeserializeOwned>(&self, msg: &str) -> Result<T>;
 
     fn sysinfo(&self) -> Result<SysInfo> {
-        let device_data = self.submit(r#"{"system":{"get_sysinfo":null}}"#)?;
-        Ok(device_data.sysinfo())
+        Ok(self
+            .send::<DeviceData>(r#"{"system":{"get_sysinfo":null}}"#)?
+            .sysinfo())
     }
 
     fn alias(&self) -> Result<String> {
@@ -30,7 +32,7 @@ pub trait DeviceActions {
             r#"{{"system":{{"set_dev_alias": {{"alias": {}}}}}}}"#,
             alias
         );
-        self.submit(&command)?;
+        self.send(&command)?;
         Ok(())
     }
 
@@ -56,7 +58,7 @@ pub trait DeviceActions {
             r#"{{"system":{{"reboot":{{"delay": {}}}}}}}"#,
             delay.as_secs()
         );
-        self.submit(&command)?;
+        self.send(&command)?;
         Ok(())
     }
 }
@@ -75,12 +77,13 @@ pub trait Switch: DeviceActions {
     }
 
     fn switch_on(&self) -> Result<()> {
-        self.submit(&r#"{"system":{"set_relay_state":{"state": 1}}}"#)?;
+        self.send(&r#"{"system":{"set_relay_state":{"state": 1}}}"#)?;
         Ok(())
     }
 
     fn switch_off(&self) -> Result<()> {
-        self.submit(&r#"{{"system":{{"set_relay_state":{{"state": 0}}}}}}"#)?;
+        // TODO: check response
+        self.send(&r#"{"system":{"set_relay_state":{"state": 0}}}"#)?;
         Ok(())
     }
 
@@ -95,7 +98,12 @@ pub trait Switch: DeviceActions {
     }
 }
 
-pub trait Light: DeviceActions {}
+pub trait Light: DeviceActions {
+    fn get_light_state(&self) -> Result<LightState> {
+        let data: GetLightStateResult = self.send(&r#"{"none.iot.smartbulb2lightingservice":{"get_light_state":null}}"#)?;
+        data.light_state()
+    }
+}
 
 pub trait Dimmer: Light {}
 
@@ -127,8 +135,8 @@ impl RawDevice {
 }
 
 impl DeviceActions for RawDevice {
-    fn submit(&self, msg: &str) -> Result<DeviceData> {
-        Ok(serde_json::from_str::<DeviceData>(
+    fn send<'a, T: DeserializeOwned>(&self, msg: &str) -> Result<T> {
+        Ok(serde_json::from_str::<T>(
             &self.protocol.send(self.addr, msg)?,
         )?)
     }
@@ -155,15 +163,14 @@ macro_rules! new_device {
         }
 
         impl DeviceActions for $x {
-            fn submit(&self, msg: &str) -> Result<DeviceData> {
-                self.raw.submit(msg)
+            fn send<T: DeserializeOwned>(&self, msg: &str) -> Result<T> {
+                self.raw.send(msg)
             }
         }
     };
 }
 
 // TODO: should it be HS110 and HS100 or simply SmartPlug like in pyhs100?
-// TODO: create a declarative macro to generate device structs with constructors
 new_device!(HS100);
 
 impl Switch for HS100 {}
@@ -175,7 +182,21 @@ impl Emeter for HS110 {}
 
 new_device!(LB110);
 
-impl Switch for LB110 {}
+impl Switch for LB110 {
+    fn is_on(&self) -> Result<bool> {
+        Ok(self.get_light_state()?.on_off == 1)
+    }
+
+    fn switch_on(&self) -> Result<()> {
+        self.send(&r#"{"smartlife.iot.smartbulb.lightingservice":{"transition_light_state":{"on_off":1}}}"#)?;
+        Ok(())
+    }
+
+    fn switch_off(&self) -> Result<()> {
+        self.send(&r#"{"smartlife.iot.smartbulb.lightingservice":{"transition_light_state":{"on_off":0}}}"#)?;
+        Ok(())
+    }
+}
 impl Light for LB110 {}
 impl Dimmer for LB110 {}
 
@@ -188,10 +209,10 @@ pub enum Device {
 
 impl Device {
     pub fn from_data(addr: SocketAddr, device_data: &DeviceData) -> Device {
-        let model = device_data.system.sysinfo.model.clone();
+        let model = device_data.clone().sysinfo().model;
         if model.contains("HS100") {
             Device::HS100(HS100::from_addr(addr))
-        } else if model.contains("HS100") {
+        } else if model.contains("HS110") {
             Device::HS110(HS110::from_addr(addr))
         } else if model.contains("LB110") {
             Device::LB110(LB110::from_addr(addr))
@@ -218,10 +239,10 @@ mod tests {
         };
 
         // act
-        let device_data = device.submit("{}").unwrap();
+        let device_data: DeviceData = device.send("{}").unwrap();
 
         // assert
-        assert_eq!("Switch Two", device_data.system.sysinfo.alias);
+        assert_eq!("Switch Two", device_data.sysinfo().alias);
     }
 
     #[test]
@@ -233,7 +254,7 @@ mod tests {
             protocol: Box::new(protocol),
         };
 
-        assert!(device.submit("{}").is_err());
+        assert!(device.send::<DeviceData>("{}").is_err());
     }
 
     #[test]
