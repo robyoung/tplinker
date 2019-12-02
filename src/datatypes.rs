@@ -5,6 +5,7 @@ type ErrCode = i16;
 #[derive(Debug, Deserialize, Clone)]
 pub struct DeviceData {
     pub system: System,
+    // TODO: remove these in favour of action specific types
     pub emeter: Option<SectionResult<Emeter>>,
     #[serde(flatten)]
     pub smartlife: Smartlife,
@@ -13,29 +14,6 @@ pub struct DeviceData {
 impl DeviceData {
     pub fn sysinfo(self) -> SysInfo {
         self.system.sysinfo
-    }
-
-    pub fn emeter(self) -> Result<Emeter> {
-        if let Some(emeter) = self.emeter {
-            match emeter {
-                SectionResult::Ok(emeter) => Ok(emeter),
-                SectionResult::Err(err) => Err(Error::from(err.clone())),
-            }
-        } else {
-            Err(Error::Other(String::from("No emeter present")))
-        }
-    }
-
-    pub fn light_state(self) -> Result<LightState> {
-        if let Some(lightingservice) = self.smartlife.lightingservice {
-            return match lightingservice {
-                SectionResult::Ok(lightingservice) => Ok(lightingservice.light_state),
-                SectionResult::Err(err) => Err(Error::from(err.clone())),
-            };
-        } else if let Some(light_state) = self.system.sysinfo.light_state {
-            return Ok(light_state);
-        }
-        Err(Error::Other(String::from("No light state")))
     }
 }
 
@@ -55,28 +33,6 @@ impl<T> SectionResult<T> {
     }
 }
 
-// TODO: rename structs to be consistent, Result for top level results
-#[derive(Clone, Deserialize, Debug)]
-pub struct TransitionLightStateResult {
-    #[serde(rename = "smartlife.iot.smartbulb.lightingservice")]
-    pub lightingservice: SectionResult<TransitionLightState>,
-}
-
-impl TransitionLightStateResult {
-    pub fn light_state(self) -> Result<LightState> {
-        match self.lightingservice {
-            SectionResult::Ok(light_state) => Ok(light_state.light_state),
-            SectionResult::Err(err) => Err(Error::from(err.clone())),
-        }
-    }
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct TransitionLightState {
-    #[serde(rename = "transition_light_state")]
-    pub light_state: LightState,
-}
-
 #[derive(Clone, Deserialize, Debug)]
 pub struct GetLightStateResult {
     #[serde(rename = "smartlife.iot.smartbulb.lightingservice")]
@@ -94,8 +50,8 @@ impl GetLightStateResult {
 
 #[derive(Clone, Deserialize, Debug)]
 pub struct GetLightState {
-    // TODO: investigate merging with previous
     #[serde(rename = "get_light_state")]
+    #[serde(alias = "transition_light_state")]
     pub light_state: LightState,
 }
 
