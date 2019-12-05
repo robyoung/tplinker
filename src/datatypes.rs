@@ -123,7 +123,7 @@ pub struct SysInfo {
     pub hw_type: String,
     pub model: String,
     #[serde(alias = "mic_mac")]
-    pub mac: String, // TODO: move out alt mic_mac
+    pub mac: String,
     #[serde(rename = "deviceId")]
     pub device_id: String,
     #[serde(rename = "hwId")]
@@ -133,8 +133,8 @@ pub struct SysInfo {
     pub alias: String,
     #[serde(alias = "description")]
     pub dev_name: String,
-    pub err_code: ErrCode,   // TODO: how small can I go?
-    pub rssi: i64,           // TODO: could this be smaller
+    pub err_code: ErrCode,
+    pub rssi: i32,
     pub active_mode: String, // TODO: Could be enum
 
     // TODO: group fields together
@@ -149,13 +149,13 @@ pub struct SysInfo {
     pub led_off: Option<u8>,
 
     // HS100
-    pub longitude_i: Option<i32>, // TODO: move out
-    pub latitude_i: Option<i32>,  // TODO: move out
+    pub longitude_i: Option<i32>,
+    pub latitude_i: Option<i32>,
     pub ntc_state: Option<u8>,    // TODO: what is this?
 
     // HS110
-    pub longitude: Option<f64>, // TODO: move out
-    pub latitude: Option<f64>,  // TODO: move out
+    pub longitude: Option<f64>,
+    pub latitude: Option<f64>,
 
     // LB110
     pub light_state: Option<LightState>,

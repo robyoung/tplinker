@@ -11,7 +11,6 @@ use std::{
     time::Duration,
 };
 
-// TODO: move things around as private items are visible to sub-modules
 pub trait DeviceActions {
     /// Send a message to a device and return its parsed response
     fn send<T: DeserializeOwned>(&self, msg: &str) -> Result<T>;
@@ -170,7 +169,6 @@ macro_rules! new_device {
     };
 }
 
-// TODO: should it be HS110 and HS100 or simply SmartPlug like in pyhs100?
 new_device!(HS100);
 
 impl Switch for HS100 {}
