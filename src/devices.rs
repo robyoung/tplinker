@@ -1,14 +1,17 @@
-use crate::{
-    datatypes::{DeviceData, SysInfo, GetLightStateResult, LightState},
-    error::{Error, Result},
-    protocol::{DefaultProtocol, Protocol},
-};
-use serde::de::DeserializeOwned;
 use std::{
     net::{AddrParseError, SocketAddr},
     result,
     str::FromStr,
     time::Duration,
+};
+
+use serde::de::DeserializeOwned;
+use serde_json::json;
+
+use crate::{
+    datatypes::{DeviceData, GetLightStateResult, LightState, SetLightState, SysInfo},
+    error::{Error, Result},
+    protocol::{DefaultProtocol, Protocol},
 };
 
 pub trait DeviceActions {
@@ -26,11 +29,10 @@ pub trait DeviceActions {
     }
 
     fn set_alias(&self, alias: &str) -> Result<()> {
-        // TODO: investigate a command helper
-        let command = format!(
-            r#"{{"system":{{"set_dev_alias": {{"alias": {}}}}}}}"#,
-            alias
-        );
+        let command = json!({
+            "system": {"set_dev_alias": {"alias": alias}}
+        })
+        .to_string();
         self.send(&command)?;
         Ok(())
     }
@@ -53,10 +55,10 @@ pub trait DeviceActions {
     }
 
     fn reboot_with_delay(&self, delay: Duration) -> Result<()> {
-        let command = format!(
-            r#"{{"system":{{"reboot":{{"delay": {}}}}}}}"#,
-            delay.as_secs()
-        );
+        let command = json!({
+            "system": {"reboot": {"delay": delay.as_secs()}}
+        })
+        .to_string();
         self.send(&command)?;
         Ok(())
     }
@@ -81,7 +83,6 @@ pub trait Switch: DeviceActions {
     }
 
     fn switch_off(&self) -> Result<()> {
-        // TODO: check response
         self.send(&r#"{"system":{"set_relay_state":{"state": 0}}}"#)?;
         Ok(())
     }
@@ -99,14 +100,84 @@ pub trait Switch: DeviceActions {
 
 pub trait Light: DeviceActions {
     fn get_light_state(&self) -> Result<LightState> {
-        let data: GetLightStateResult = self.send(&r#"{"none.iot.smartbulb2lightingservice":{"get_light_state":null}}"#)?;
+        let command = json!({
+            "none.iot.smartbulb2lightingservice": {
+                "get_light_state": null
+            }
+        })
+        .to_string();
+        let data: GetLightStateResult = self.send(&command)?;
         data.light_state()
+    }
+
+    fn set_light_state(&self, light_state: SetLightState) -> Result<()> {
+        let command = json!({
+            "none.iot.smartbulb2lightingservice": {
+                "transition_light_state": light_state,
+            },
+        })
+        .to_string();
+        self.send(&command)?;
+        Ok(())
     }
 }
 
-pub trait Dimmer: Light {}
+pub trait Dimmer: Light {
+    fn brightness(&self) -> Result<u16> {
+        Ok(self.get_light_state()?.dft_on_state().brightness)
+    }
 
-pub trait Colour: Light {}
+    fn set_brightness(&self, brightness: u16) -> Result<()> {
+        // TODO: figure out how to not send nulls
+        self.set_light_state(SetLightState {
+            on_off: None,
+            hue: None,
+            saturation: None,
+            brightness: Some(brightness),
+            color_temp: None,
+        })?;
+        Ok(())
+    }
+}
+
+pub trait Colour: Light {
+    fn get_hsv(&self) -> Result<(u16, u16, u16)> {
+        let light_state = self.get_light_state()?;
+        let dft_on_state = light_state.dft_on_state();
+
+        Ok((
+            dft_on_state.hue,
+            dft_on_state.saturation,
+            dft_on_state.brightness,
+        ))
+    }
+
+    fn set_hsv(&self, hue: u16, saturation: u16, brightness: u16) -> Result<()> {
+        if hue > 360 {
+            return Err(Error::Other(String::from(
+                "Invalid hue; must be between 0 and 360",
+            )));
+        }
+        if saturation > 100 {
+            return Err(Error::Other(String::from(
+                "Invalid saturation; must be between 0 and 100",
+            )));
+        }
+        if brightness > 100 {
+            return Err(Error::Other(String::from(
+                "Invalid brightness; must be between 0 and 100",
+            )));
+        }
+        self.set_light_state(SetLightState {
+            on_off: None,
+            hue: Some(hue),
+            saturation: Some(saturation),
+            brightness: Some(brightness),
+            color_temp: None,
+        })?;
+        Ok(())
+    }
+}
 
 pub trait Emeter: DeviceActions {}
 

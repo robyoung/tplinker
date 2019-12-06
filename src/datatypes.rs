@@ -151,7 +151,7 @@ pub struct SysInfo {
     // HS100
     pub longitude_i: Option<i32>,
     pub latitude_i: Option<i32>,
-    pub ntc_state: Option<u8>,    // TODO: what is this?
+    pub ntc_state: Option<u8>, // TODO: what is this?
 
     // HS110
     pub longitude: Option<f64>,
@@ -163,6 +163,24 @@ pub struct SysInfo {
     pub is_color: Option<u8>,
     pub is_variable_color_temp: Option<u8>,
     pub heapsize: Option<u64>,
+}
+
+impl SysInfo {
+    pub fn is_dimmable(&self) -> bool {
+        if let Some(is_dimmable) = self.is_dimmable {
+            is_dimmable == 1
+        } else {
+            false
+        }
+    }
+
+    pub fn is_color(&self) -> bool {
+        if let Some(is_color) = self.is_color {
+            is_color == 1
+        } else {
+            false
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -190,10 +208,19 @@ impl LightState {
 #[derive(Debug, Deserialize, Clone)]
 pub struct DftOnState {
     pub mode: String,
-    pub hue: i32,
-    pub saturation: i32,
-    pub color_temp: i32,
-    pub brightness: i32,
+    pub hue: u16,
+    pub saturation: u16,
+    pub color_temp: u16,
+    pub brightness: u16,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct SetLightState {
+    pub on_off: Option<u8>,
+    pub hue: Option<u16>,
+    pub saturation: Option<u16>,
+    pub color_temp: Option<u16>,
+    pub brightness: Option<u16>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
