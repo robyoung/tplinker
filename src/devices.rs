@@ -179,7 +179,35 @@ pub trait Colour: Light {
     }
 }
 
-pub trait Emeter: DeviceActions {}
+pub trait Emeter: DeviceActions {
+    fn emeter_type(&self) -> String {
+        String::from("emeter")
+    }
+
+    // TODO: add proper return type
+    fn get_emeter_realtime(&self) -> Result<serde_json::Value> {
+        let command = json!({
+            self.emeter_type(): {"get_realtime": null}
+        }).to_string();
+        Ok(self.send(&command)?)
+    }
+
+    // TODO: add proper return type
+    fn get_emeter_daily(&self, year: u16, month: u8) -> Result<serde_json::Value> {
+        let command = json!({
+            self.emeter_type(): {"get_daystat": {"month": month, "year": year}}
+        }).to_string();
+        Ok(self.send(&command)?)
+    }
+
+    // TODO: add proper return type
+    fn get_emeter_monthly(&self, year: u16) -> Result<serde_json::Value> {
+        let command = json!({
+            self.emeter_type(): {"get_monthstat": {"year": year}}
+        }).to_string();
+        Ok(self.send(&command)?)
+    }
+}
 
 // DEVICES
 
@@ -268,6 +296,11 @@ impl Switch for LB110 {
 }
 impl Light for LB110 {}
 impl Dimmer for LB110 {}
+impl Emeter for LB110 {
+    fn emeter_type(&self) -> String {
+        String::from("smartlife.iot.common.emeter")
+    }
+}
 
 pub enum Device {
     HS100(HS100),

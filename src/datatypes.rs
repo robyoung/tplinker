@@ -216,10 +216,15 @@ pub struct DftOnState {
 
 #[derive(Debug, Serialize, Clone)]
 pub struct SetLightState {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub on_off: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub hue: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub saturation: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub color_temp: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub brightness: Option<u16>,
 }
 
