@@ -1,7 +1,7 @@
 extern crate tplinker;
 
 use tplinker::{
-    devices::{Device, DeviceActions, Switch, LB110},
+    devices::{Device, Switch, LB110, Dimmer},
     discovery::discover,
 };
 
@@ -33,10 +33,11 @@ fn main() {
             _ => println!("{} not switchable", sysinfo.alias),
         }
     }
+    println!("");
 
     let device = LB110::new("192.168.0.25:9999").unwrap();
 
-    println!("{:?}", device.sysinfo().unwrap());
-    println!("{:?}", device.is_on());
-    device.switch_on().unwrap();
+    println!("{:?}", device.brightness().unwrap());
+    device.set_brightness(25).unwrap();
+    println!("{:?}", device.brightness().unwrap());
 }

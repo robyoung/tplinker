@@ -14,6 +14,10 @@ use crate::{
     protocol::{DefaultProtocol, Protocol},
 };
 
+
+const LIGHT_SERVICE: &str = "smartlife.iot.smartbulb.lightingservice";
+
+
 pub trait DeviceActions {
     /// Send a message to a device and return its parsed response
     fn send<T: DeserializeOwned>(&self, msg: &str) -> Result<T>;
@@ -101,7 +105,7 @@ pub trait Switch: DeviceActions {
 pub trait Light: DeviceActions {
     fn get_light_state(&self) -> Result<LightState> {
         let command = json!({
-            "none.iot.smartbulb2lightingservice": {
+            LIGHT_SERVICE: {
                 "get_light_state": null
             }
         })
@@ -110,15 +114,14 @@ pub trait Light: DeviceActions {
         data.light_state()
     }
 
-    fn set_light_state(&self, light_state: SetLightState) -> Result<()> {
+    fn set_light_state(&self, light_state: SetLightState) -> Result<LightState> {
         let command = json!({
-            "none.iot.smartbulb2lightingservice": {
+            LIGHT_SERVICE: {
                 "transition_light_state": light_state,
             },
         })
         .to_string();
-        self.send(&command)?;
-        Ok(())
+        self.send::<GetLightStateResult>(&command)?.light_state()
     }
 }
 
