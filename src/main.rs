@@ -1,7 +1,8 @@
 extern crate tplinker;
 
 use tplinker::{
-    devices::{Device, Switch, LB110, Dimmer},
+    devices::{Device, LB110},
+    capabilities::{Switch, Dimmer, Emeter},
     discovery::discover,
 };
 
@@ -40,4 +41,7 @@ fn main() {
     println!("{:?}", device.brightness().unwrap());
     device.set_brightness(25).unwrap();
     println!("{:?}", device.brightness().unwrap());
+
+    println!("");
+    println!("{:?}", device.get_emeter_realtime());
 }

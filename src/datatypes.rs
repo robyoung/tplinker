@@ -2,10 +2,11 @@ use crate::error::{Error, Result, SectionError};
 
 type ErrCode = i16;
 
+pub(crate) const LIGHT_SERVICE: &str = "smartlife.iot.smartbulb.lightingservice";
+
 #[derive(Debug, Deserialize, Clone)]
 pub struct DeviceData {
     pub system: System,
-    // TODO: remove these in favour of action specific types
     pub emeter: Option<SectionResult<Emeter>>,
     #[serde(flatten)]
     pub smartlife: Smartlife,
