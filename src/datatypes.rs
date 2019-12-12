@@ -5,7 +5,7 @@ type ErrCode = i16;
 
 pub(crate) const LIGHT_SERVICE: &str = "smartlife.iot.smartbulb.lightingservice";
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct DeviceData {
     pub system: System,
     pub emeter: Option<SectionResult<Emeter>>,
@@ -19,7 +19,7 @@ impl DeviceData {
     }
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(untagged)]
 pub enum SectionResult<T> {
     Ok(T),
@@ -57,7 +57,7 @@ pub struct GetLightState {
     pub light_state: LightState,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Smartlife {
     #[serde(rename = "smartlife.iot.dimmer")]
     pub dimmer: Option<SectionError>,
@@ -91,31 +91,31 @@ impl Smartlife {
     }
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct SmartlifeEmeter {
     #[serde(rename = "get_realtime")]
     pub realtime: SmartlifeEmeterRealtime,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct SmartlifeEmeterRealtime {
     pub power_mw: u32,
     pub err_code: ErrCode,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct SmartlifeLightingService {
     #[serde(rename = "get_light_state")]
     pub light_state: LightState,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct System {
     #[serde(rename = "get_sysinfo")]
     pub sysinfo: SysInfo,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct SysInfo {
     // COMMON
     pub sw_ver: String,
@@ -185,7 +185,7 @@ impl SysInfo {
     }
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct LightState {
     pub on_off: u8,
     #[serde(rename = "dft_on_state")]
@@ -207,7 +207,7 @@ impl LightState {
     }
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct DftOnState {
     pub mode: String,
     pub hue: u16,
@@ -230,14 +230,14 @@ pub struct SetLightState {
     pub brightness: Option<u16>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Emeter {
     #[serde(rename = "get_realtime")]
     pub realtime: SectionResult<EmeterRealtime>,
     // TODO: add other stats aggregations
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct EmeterRealtime {
     pub current: f64,
     pub voltage: f64,

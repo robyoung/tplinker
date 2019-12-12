@@ -73,3 +73,5 @@ pub mod devices;
 pub mod discovery;
 pub mod error;
 mod protocol;
+
+pub use discovery::discover;

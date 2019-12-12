@@ -61,7 +61,7 @@ impl From<SectionError> for Error {
 
 pub type Result<T> = result::Result<T, Error>;
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct SectionError {
     pub err_code: i16,
     pub err_msg: String,
