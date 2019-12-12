@@ -9,7 +9,9 @@ use serde::de::DeserializeOwned;
 use serde_json::json;
 
 use crate::{
-    datatypes::{DeviceData, GetLightStateResult, LightState, SetLightState, SysInfo, LIGHT_SERVICE},
+    datatypes::{
+        DeviceData, GetLightStateResult, LightState, SetLightState, SysInfo, LIGHT_SERVICE,
+    },
     error::{Error, Result},
 };
 
@@ -163,7 +165,9 @@ pub trait Dimmer: Light {
     /// Set percentage brightness of bulb
     fn set_brightness(&self, brightness: u16) -> Result<()> {
         if brightness > 100 {
-            Err(Error::Other(String::from("Brightness must be between 0 and 100")))
+            Err(Error::Other(String::from(
+                "Brightness must be between 0 and 100",
+            )))
         } else {
             self.set_light_state(SetLightState {
                 on_off: None,
@@ -198,9 +202,7 @@ pub trait Colour: Light {
     /// Brightness must be between 0 and 100.
     fn set_hsv(&self, hue: u16, saturation: u16, brightness: u16) -> Result<()> {
         if hue > 360 {
-            return Err(Error::Other(String::from(
-                "Hue must be between 0 and 360",
-            )));
+            return Err(Error::Other(String::from("Hue must be between 0 and 360")));
         }
         if saturation > 100 {
             return Err(Error::Other(String::from(
@@ -237,7 +239,8 @@ pub trait Emeter: DeviceActions {
     fn get_emeter_realtime(&self) -> Result<serde_json::Value> {
         let command = json!({
             self.emeter_type(): {"get_realtime": null}
-        }).to_string();
+        })
+        .to_string();
         Ok(self.send(&command)?)
     }
 
@@ -246,7 +249,8 @@ pub trait Emeter: DeviceActions {
     fn get_emeter_daily(&self, year: u16, month: u8) -> Result<serde_json::Value> {
         let command = json!({
             self.emeter_type(): {"get_daystat": {"month": month, "year": year}}
-        }).to_string();
+        })
+        .to_string();
         Ok(self.send(&command)?)
     }
 
@@ -255,7 +259,8 @@ pub trait Emeter: DeviceActions {
     fn get_emeter_monthly(&self, year: u16) -> Result<serde_json::Value> {
         let command = json!({
             self.emeter_type(): {"get_monthstat": {"year": year}}
-        }).to_string();
+        })
+        .to_string();
         Ok(self.send(&command)?)
     }
 }

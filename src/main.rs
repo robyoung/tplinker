@@ -1,8 +1,8 @@
 extern crate tplinker;
 
 use tplinker::{
+    capabilities::{Dimmer, Emeter, Switch},
     devices::{Device, LB110},
-    capabilities::{Switch, Dimmer, Emeter},
     discovery::discover,
 };
 
