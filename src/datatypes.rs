@@ -1,3 +1,4 @@
+//! Data types being sent to and from the devices
 use crate::error::{Error, Result, SectionError};
 
 type ErrCode = i16;

@@ -1,3 +1,24 @@
+//! Discover devices on the local network
+//!
+//! ```
+//! use tplinker::{
+//!   discovery::discover,
+//!   devices::Device,
+//!   capabilities::Switch,
+//! };
+//!
+//! fn main() {
+//!   for (addr, data) in discover().unwrap() {
+//!     let device = Device::from_data(addr, &data);
+//!     let sysinfo = data.sysinfo();
+//!     println!("{}\t{}\t{}", addr, sysinfo.alias, sysinfo.hw_type);
+//!     match device {
+//!       Device::HS110(device) => { device.switch_on().unwrap(); },
+//!       _ => {},
+//!     }
+//!   }
+//! }
+//! ```
 use std::{
     collections::HashMap,
     net::{SocketAddr, UdpSocket},
@@ -15,6 +36,7 @@ const QUERY: &str = r#"{
     "smartlife.iot.smartbulb.lightingservice": {"get_light_state": null}
 }"#;
 
+/// Discover TPLink smart devices on the local network
 pub fn discover() -> Result<Vec<(SocketAddr, DeviceData)>> {
     let socket = UdpSocket::bind("0.0.0.0:0")?;
     socket.set_broadcast(true)?;

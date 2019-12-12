@@ -1,3 +1,8 @@
+//! Features available on devices
+//!
+//! Different devices have different combinations of capabilities available to them. To
+//! make these easier to work with in a type safe and consistent way sets of functions
+//! are grouped together into capability traits that can be implemented on devices.
 use std::time::Duration;
 
 use serde::de::DeserializeOwned;
@@ -8,20 +13,30 @@ use crate::{
     error::{Error, Result},
 };
 
+/// The basic set of functions available to all TPlink smart devices
+///
+/// All devices support this trait.
 pub trait DeviceActions {
     /// Send a message to a device and return its parsed response
     fn send<T: DeserializeOwned>(&self, msg: &str) -> Result<T>;
 
+    /// Get system information
     fn sysinfo(&self) -> Result<SysInfo> {
         Ok(self
             .send::<DeviceData>(r#"{"system":{"get_sysinfo":null}}"#)?
             .sysinfo())
     }
 
+    /// Get the alias of the device
+    ///
+    /// This is a user defined name for the device.
     fn alias(&self) -> Result<String> {
         Ok(self.sysinfo()?.alias)
     }
 
+    /// Set the alias of the device
+    ///
+    /// This is a user defined name for the device.
     fn set_alias(&self, alias: &str) -> Result<()> {
         let command = json!({
             "system": {"set_dev_alias": {"alias": alias}}
@@ -31,6 +46,7 @@ pub trait DeviceActions {
         Ok(())
     }
 
+    /// Get the latitude and longitude coordinates
     fn location(&self) -> Result<(f64, f64)> {
         let sysinfo = self.sysinfo()?;
         if let (Some(latitude), Some(longitude)) = (sysinfo.latitude, sysinfo.longitude) {
@@ -44,10 +60,12 @@ pub trait DeviceActions {
         }
     }
 
+    /// Reboot the device in 1 second
     fn reboot(&self) -> Result<()> {
         self.reboot_with_delay(Duration::from_secs(1))
     }
 
+    /// Reboot the device with a specified delay
     fn reboot_with_delay(&self, delay: Duration) -> Result<()> {
         let command = json!({
             "system": {"reboot": {"delay": delay.as_secs()}}
@@ -58,7 +76,11 @@ pub trait DeviceActions {
     }
 }
 
+/// Devices that can be switched on and off
+///
+/// All devices support this trait.
 pub trait Switch: DeviceActions {
+    /// Check whether the device is on
     fn is_on(&self) -> Result<bool> {
         if let Some(relay_state) = self.sysinfo()?.relay_state {
             Ok(relay_state > 0)
@@ -67,20 +89,27 @@ pub trait Switch: DeviceActions {
         }
     }
 
+    /// Check whether the device is off
     fn is_off(&self) -> Result<bool> {
         Ok(!self.is_on()?)
     }
 
+    /// Switch the device on
     fn switch_on(&self) -> Result<()> {
         self.send(&r#"{"system":{"set_relay_state":{"state": 1}}}"#)?;
         Ok(())
     }
 
+    /// Switch the device off
     fn switch_off(&self) -> Result<()> {
         self.send(&r#"{"system":{"set_relay_state":{"state": 0}}}"#)?;
         Ok(())
     }
 
+    /// Toggle the device's on state
+    ///
+    /// If the device is on, switch it off.
+    /// If the device is off, switch it on.
     fn toggle(&self) -> Result<bool> {
         if self.is_on()? {
             self.switch_off()?;
@@ -92,7 +121,11 @@ pub trait Switch: DeviceActions {
     }
 }
 
+/// Smart light devices
+///
+/// The LB class of devices support this trait.
 pub trait Light: DeviceActions {
+    /// Get the current state of the light
     fn get_light_state(&self) -> Result<LightState> {
         let command = json!({
             LIGHT_SERVICE: {
@@ -104,6 +137,11 @@ pub trait Light: DeviceActions {
         data.light_state()
     }
 
+    /// Set the state of the light
+    ///
+    /// This is a low level method, and has no validation. You should use one of the
+    /// higher level methods such as [`set_brightness`](./trait.Dimmer.html#method.set_brightness)
+    /// or [`set_hsv`](./trait.Colour.html#method.set_hsv).
     fn set_light_state(&self, light_state: SetLightState) -> Result<LightState> {
         let command = json!({
             LIGHT_SERVICE: {
@@ -115,25 +153,33 @@ pub trait Light: DeviceActions {
     }
 }
 
+/// Dimmable smart light devices
 pub trait Dimmer: Light {
+    /// Get percentage brightness of bulb
     fn brightness(&self) -> Result<u16> {
         Ok(self.get_light_state()?.dft_on_state().brightness)
     }
 
+    /// Set percentage brightness of bulb
     fn set_brightness(&self, brightness: u16) -> Result<()> {
-        // TODO: figure out how to not send nulls
-        self.set_light_state(SetLightState {
-            on_off: None,
-            hue: None,
-            saturation: None,
-            brightness: Some(brightness),
-            color_temp: None,
-        })?;
-        Ok(())
+        if brightness > 100 {
+            Err(Error::Other(String::from("Brightness must be between 0 and 100")))
+        } else {
+            self.set_light_state(SetLightState {
+                on_off: None,
+                hue: None,
+                saturation: None,
+                brightness: Some(brightness),
+                color_temp: None,
+            })?;
+            Ok(())
+        }
     }
 }
 
+/// Full colour smart light devices
 pub trait Colour: Light {
+    /// Get hue, saturation and value (brightness)
     fn get_hsv(&self) -> Result<(u16, u16, u16)> {
         let light_state = self.get_light_state()?;
         let dft_on_state = light_state.dft_on_state();
@@ -145,20 +191,25 @@ pub trait Colour: Light {
         ))
     }
 
+    /// Get hue, saturation and value (brightness)
+    ///
+    /// Hue must be between 0 and 360.
+    /// Saturation must be between 0 and 100.
+    /// Brightness must be between 0 and 100.
     fn set_hsv(&self, hue: u16, saturation: u16, brightness: u16) -> Result<()> {
         if hue > 360 {
             return Err(Error::Other(String::from(
-                "Invalid hue; must be between 0 and 360",
+                "Hue must be between 0 and 360",
             )));
         }
         if saturation > 100 {
             return Err(Error::Other(String::from(
-                "Invalid saturation; must be between 0 and 100",
+                "Saturation must be between 0 and 100",
             )));
         }
         if brightness > 100 {
             return Err(Error::Other(String::from(
-                "Invalid brightness; must be between 0 and 100",
+                "Brightness must be between 0 and 100",
             )));
         }
         self.set_light_state(SetLightState {
@@ -172,11 +223,16 @@ pub trait Colour: Light {
     }
 }
 
+/// Smart devices with energy usage tracking.
 pub trait Emeter: DeviceActions {
+    /// Type of the emeter
+    ///
+    /// This is used by other Emeter methods. It is probably not useful to end users.
     fn emeter_type(&self) -> String {
         String::from("emeter")
     }
 
+    /// Get the realtime energy usage
     // TODO: add proper return type
     fn get_emeter_realtime(&self) -> Result<serde_json::Value> {
         let command = json!({
@@ -185,6 +241,7 @@ pub trait Emeter: DeviceActions {
         Ok(self.send(&command)?)
     }
 
+    /// Get the daily energy usage for a given month
     // TODO: add proper return type
     fn get_emeter_daily(&self, year: u16, month: u8) -> Result<serde_json::Value> {
         let command = json!({
@@ -193,6 +250,7 @@ pub trait Emeter: DeviceActions {
         Ok(self.send(&command)?)
     }
 
+    /// Get the monthly energy usage for a given year
     // TODO: add proper return type
     fn get_emeter_monthly(&self, year: u16) -> Result<serde_json::Value> {
         let command = json!({
@@ -201,4 +259,3 @@ pub trait Emeter: DeviceActions {
         Ok(self.send(&command)?)
     }
 }
-

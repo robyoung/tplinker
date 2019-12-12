@@ -1,3 +1,19 @@
+//! Structs for specific device models.
+//!
+//! ```
+//! use tplinker::{
+//!   devices::LB110,
+//!   capabilities::{Switch, Dimmer},
+//! };
+//!
+//! let device = LB110::new("192.168.0.99:9999").unwrap();
+//! if device.is_on().unrwap() {
+//!   let brightness = device.brightness().unwrap();
+//!   if brightness < 50 {
+//!     device.set_brightness(brightness + 20).unwrap();
+//!   }
+//! }
+//! ```
 use std::{
     net::{AddrParseError, SocketAddr},
     result,
@@ -106,6 +122,11 @@ impl Emeter for LB110 {
     }
 }
 
+/// An enum of the available device types.
+///
+/// This is returned from [`discover`](../discovery/fn.discover.html).
+/// If the device type is not recognised but we can parse the response the
+/// `Unknown` variant is returned.
 pub enum Device {
     HS100(HS100),
     HS110(HS110),
