@@ -62,6 +62,7 @@ impl DeviceActions for RawDevice {
 
 macro_rules! new_device {
     ( $x:ident ) => {
+        #[repr(transparent)]
         pub struct $x {
             raw: RawDevice,
         }
