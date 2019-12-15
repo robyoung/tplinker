@@ -56,6 +56,22 @@ fn command_reboot(addresses: Vec<SocketAddr>, delay: Duration, format: Format) -
     ).collect()
 }
 
+fn command_set_alias(addr: SocketAddr, alias: &str, format: Format) -> Vec<Value> {
+    let dev = RawDevice::from_addr(addr);
+    let done = dev.set_alias(alias)
+        .map(|_| Value::Bool(true))
+        .unwrap_or_else(|err| Value::String(format!("Error: {}", err)));
+
+    device_from_addr(addr).map(|(addr, dev, info)| {
+        // In case it errors but has actually succeeded
+        let done = if info.alias == alias { Value::Bool(true) } else { done };
+        vec![format.actioned(addr, dev, info, "Renamed", done)]
+    }).unwrap_or_else(|err| {
+        eprintln!("While querying {}: {}", addr, err);
+        Vec::new()
+    })
+}
+
 fn device_from_addr(addr: SocketAddr) -> TpResult<(SocketAddr, Device, SysInfo)> {
     let raw = RawDevice::from_addr(addr);
     let info = raw.sysinfo()?;
@@ -319,6 +335,11 @@ fn main() {
                  .required(true)
             )
         )
+        .subcommand(SubCommand::with_name("set-alias")
+            .about("Set the alias of a device")
+            .arg(Arg::with_name("address").required(true))
+            .arg(Arg::with_name("alias").required(true))
+        )
         .get_matches();
 
     let format = if matches.is_present("json") {
@@ -336,12 +357,14 @@ fn main() {
         }
     }
 
+    fn parse_address(addr: &str) -> SocketAddr {
+        addr.parse().map_err(|_| ()).or_else(|_| -> Result<_, ()> {
+            Ok(SocketAddr::new(addr.parse().map_err(|_| ())?, 9999))
+        }).expect(&format!("not a valid address: {}", addr))
+    }
+
     fn parse_addresses(matches: &clap::ArgMatches) -> Vec<SocketAddr> {
-        matches.values_of("address").unwrap().into_iter().map(
-            |addr| addr.parse().map_err(|_| ()).or_else(|_| -> Result<_, ()> {
-                Ok(SocketAddr::new(addr.parse().map_err(|_| ())?, 9999))
-            }).expect(&format!("not a valid address: {}", addr))
-        ).collect()
+        matches.values_of("address").unwrap().into_iter().map(parse_address).collect()
     }
 
     format.output(match matches.subcommand() {
@@ -358,6 +381,11 @@ fn main() {
         },
         ("reboot", Some(matches)) => {
             command_reboot(parse_addresses(&matches), parse_seconds(matches.value_of("delay").unwrap(), 1), format)
+        },
+        ("set-alias", Some(matches)) => {
+            let address = parse_address(matches.value_of("address").unwrap());
+            let alias = matches.value_of("alias").unwrap();
+            command_set_alias(address, alias, format)
         },
         _ => unreachable!()
     })
