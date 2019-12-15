@@ -72,6 +72,51 @@ fn command_set_alias(addr: SocketAddr, alias: &str, format: Format) -> Vec<Value
     })
 }
 
+fn command_switch_toggle(addr: SocketAddr, state: &str, format: Format) -> Vec<Value> {
+    let (expected, statename) = match state {
+        "toggle" => (None, "Toggled"),
+        "on" => (Some(true), "Switched on"),
+        "off" => (Some(false), "Switched off"),
+        _ => unreachable!(),
+    };
+
+    device_from_addr(addr).and_then(|(addr, dev, _info)| {
+        let actual = device_is_on(&dev).unwrap();
+        let expected = match expected {
+            None => !actual,
+            Some(e) => e
+        };
+
+        let done = if expected == actual {
+            Value::Bool(false)
+        } else {
+            match &dev {
+                Device::HS100(s) => toggle_switch(s, state),
+                Device::HS110(s) => toggle_switch(s, state),
+                Device::LB110(s) => toggle_switch(s, state),
+                _ => panic!("not a switchable device: {}", addr)
+            }
+                .map(|_| Value::Bool(true))
+                .unwrap_or_else(|err| {
+                    // In case it errors but has actually succeeded
+                    let current = device_is_on(&dev).unwrap();
+                    if expected == current {
+                        Value::Bool(true)
+                    } else {
+                        Value::String(format!("Error: {}", err))
+                    }
+                })
+        };
+
+        device_from_addr(addr).map(|(addr, dev, info)| (addr, dev, info, done))
+    }).map(|(addr, dev, info, done)| {
+        vec![format.actioned(addr, dev, info, statename, done)]
+    }).unwrap_or_else(|err| {
+        eprintln!("While querying {}: {}", addr, err);
+        Vec::new()
+    })
+}
+
 fn device_from_addr(addr: SocketAddr) -> TpResult<(SocketAddr, Device, SysInfo)> {
     let raw = RawDevice::from_addr(addr);
     let info = raw.sysinfo()?;
@@ -101,12 +146,21 @@ fn pad(value: &str, padding: usize) -> String {
     format!("{}{}", value, pad)
 }
 
-fn device_is_on(device: Device) -> Option<bool> {
+fn device_is_on(device: &Device) -> Option<bool> {
     match device {
         Device::HS100(device) => device.is_on().ok(),
         Device::HS110(device) => device.is_on().ok(),
         Device::LB110(device) => device.is_on().ok(),
         _ => None,
+    }
+}
+
+fn toggle_switch<S: Switch>(switch: &S, state: &str) -> TpResult<bool> {
+    match state {
+        "on" => switch.switch_on().and(Ok(true)),
+        "off" => switch.switch_off().and(Ok(false)),
+        "toggle" => switch.toggle(),
+        _ => unreachable!()
     }
 }
 
@@ -148,7 +202,7 @@ impl Format {
                             let order_next = fields.len();
                             let k = key.as_str().unwrap().to_string();
                             let h = human_stringify(&value);
-                            let hlen = h.len();
+                            let hlen = h.len().max(k.len());
                             proc.insert(k.clone(), h);
                             fields.entry(k).and_modify(|(_, len)| {
                                 if *len < hlen {
@@ -205,7 +259,7 @@ impl Format {
                     ["Product", sysinfo.dev_name],
                     ["Model", sysinfo.model],
                     ["Signal", format!("{} dB", sysinfo.rssi)],
-                    ["On?", device_is_on(device)],
+                    ["On?", device_is_on(&device)],
                 ])
             },
             Format::Long => {
@@ -225,7 +279,7 @@ impl Format {
                     ["Latitude", lat],
                     ["Longitude", lon],
                     ["Mode", sysinfo.active_mode],
-                    ["On?", device_is_on(device)],
+                    ["On?", device_is_on(&device)],
                 ])
             },
             Format::JSON => {
@@ -336,9 +390,18 @@ fn main() {
             )
         )
         .subcommand(SubCommand::with_name("set-alias")
-            .about("Set the alias of a device")
+            .about("Rename a device")
             .arg(Arg::with_name("address").required(true))
             .arg(Arg::with_name("alias").required(true))
+        )
+        .subcommand(SubCommand::with_name("switch")
+            .about("Toggle a switchable device")
+            .arg(Arg::with_name("address").required(true))
+            .arg(Arg::with_name("state")
+                 .possible_values(&["on", "off", "toggle"])
+                 .default_value("toggle")
+                 .required(true)
+            )
         )
         .get_matches();
 
@@ -386,6 +449,11 @@ fn main() {
             let address = parse_address(matches.value_of("address").unwrap());
             let alias = matches.value_of("alias").unwrap();
             command_set_alias(address, alias, format)
+        },
+        ("switch", Some(matches)) => {
+            let address = parse_address(matches.value_of("address").unwrap());
+            let state = matches.value_of("state").unwrap();
+            command_switch_toggle(address, state, format)
         },
         _ => unreachable!()
     })
