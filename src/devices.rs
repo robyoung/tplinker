@@ -74,6 +74,10 @@ macro_rules! new_device {
                 })
             }
 
+            pub unsafe fn from_raw(raw: RawDevice) -> Self {
+                Self { raw }
+            }
+
             pub fn from_addr(addr: SocketAddr) -> Self {
                 Self {
                     raw: RawDevice::from_addr(addr),
@@ -146,6 +150,17 @@ impl Device {
             Device::LB110(LB110::from_addr(addr))
         } else {
             Device::Unknown(RawDevice::from_addr(addr))
+        }
+    }
+}
+
+impl DeviceActions for Device {
+    fn send<T: DeserializeOwned>(&self, msg: &str) -> Result<T> {
+        match self {
+            Device::HS100(d) => d.send(msg),
+            Device::HS110(d) => d.send(msg),
+            Device::LB110(d) => d.send(msg),
+            Device::Unknown(d) => d.send(msg),
         }
     }
 }

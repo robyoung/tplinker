@@ -1,5 +1,3 @@
-extern crate tplinker;
-
 use std::{
     net::SocketAddr,
     time::Duration,
@@ -34,34 +32,52 @@ fn command_discover(timeout: Option<Duration>, format: Format) -> Vec<Value> {
 }
 
 fn command_status(addresses: Vec<SocketAddr>, format: Format) -> Vec<Value> {
-    use std::mem::transmute;
     use rayon::prelude::*;
+    addresses.into_par_iter().filter_map(|addr|
+        device_from_addr(addr)
+            .map(|(addr, dev, info)| format.status(addr, dev, info))
+            .map_err(|err| eprintln!("While querying {}: {}", addr, err))
+            .ok()
+    ).collect()
+}
 
-    addresses.into_par_iter().map(|addr| {
-        let raw = RawDevice::from_addr(addr);
-        let info = raw.sysinfo()?;
+fn command_reboot(addresses: Vec<SocketAddr>, delay: Duration, format: Format) -> Vec<Value> {
+    use rayon::prelude::*;
+    addresses.into_par_iter().filter_map(|addr|
+        device_from_addr(addr)
+            .map(|(addr, dev, info)| {
+                let result = dev.reboot_with_delay(delay)
+                    .map(|_| Value::Bool(true))
+                    .unwrap_or_else(|err| Value::String(format!("Error: {}", err)));
+                format.actioned(addr, dev, info, "Rebooted?", result)
+            })
+            .map_err(|err| eprintln!("While querying {}: {}", addr, err))
+            .ok()
+    ).collect()
+}
 
-        // Re-interpret as correct model
-        let (dev, info) = if info.model.starts_with("HS100") {
-            let dev: HS100 = unsafe { transmute(raw) };
-            let info = dev.sysinfo()?;
-            (Device::HS100(dev), info)
-        } else if info.model.starts_with("HS110") {
-            let dev: HS110 = unsafe { transmute(raw) };
-            let info = dev.sysinfo()?;
-            (Device::HS110(dev), info)
-        } else if info.model.starts_with("LB110") {
-            let dev: LB110 = unsafe { transmute(raw) };
-            let info = dev.sysinfo()?;
-            (Device::LB110(dev), info)
-        } else {
-            (Device::Unknown(raw), info)
-        };
+fn device_from_addr(addr: SocketAddr) -> TpResult<(SocketAddr, Device, SysInfo)> {
+    let raw = RawDevice::from_addr(addr);
+    let info = raw.sysinfo()?;
 
-        Ok(format.status(addr, dev, info))
-    }).filter_map(|res: TpResult<_>|
-        res.map_err(|err| eprintln!("Fetch error: {}", err)).ok()
-    ).collect::<Vec<Value>>()
+    // Re-interpret as correct model
+    let (dev, info) = if info.model.starts_with("HS100") {
+        let dev = unsafe { HS100::from_raw(raw) };
+        let info = dev.sysinfo()?;
+        (Device::HS100(dev), info)
+    } else if info.model.starts_with("HS110") {
+        let dev = unsafe { HS110::from_raw(raw) };
+        let info = dev.sysinfo()?;
+        (Device::HS110(dev), info)
+    } else if info.model.starts_with("LB110") {
+        let dev = unsafe { LB110::from_raw(raw) };
+        let info = dev.sysinfo()?;
+        (Device::LB110(dev), info)
+    } else {
+        (Device::Unknown(raw), info)
+    };
+
+    Ok((addr, dev, info))
 }
 
 fn pad(value: &str, padding: usize) -> String {
@@ -200,6 +216,43 @@ impl Format {
         }
     }
 
+    fn actioned(self, addr: SocketAddr, device: Device, sysinfo: SysInfo, action: &'static str, result: Value) -> Value {
+        match self {
+            Format::Short => {
+                json!([
+                    ["Address", addr],
+                    ["Alias", sysinfo.alias],
+                    ["Product", sysinfo.dev_name],
+                    ["Model", sysinfo.model],
+                    [action, result],
+                ])
+            },
+            Format::Long => {
+                json!([
+                    ["Address", addr],
+                    ["MAC", sysinfo.mac],
+                    ["Alias", sysinfo.alias],
+                    ["Product", sysinfo.dev_name],
+                    ["Type", sysinfo.hw_type],
+                    ["Model", sysinfo.model],
+                    ["Version", sysinfo.sw_ver],
+                    [action, result],
+                ])
+            },
+            Format::JSON => json!({
+                "addr": addr,
+                "actioned": {
+                    "action": action,
+                    "result": result,
+                },
+                "device": Self::device(device),
+                "data": {
+                    "system": sysinfo,
+                },
+            }),
+        }
+    }
+
     fn device(device: Device) -> &'static str {
         match device {
             Device::HS100(_) => "HS100",
@@ -242,8 +295,18 @@ fn main() {
                  .required(true)
             )
         )
-        .subcommand(SubCommand::with_name("HS110")
-            .about("Query and control an HS110 device")
+        .subcommand(SubCommand::with_name("reboot")
+            .about("Reboot one or more device")
+            .arg(Arg::with_name("delay")
+                 .long("delay")
+                 .takes_value(true)
+                 .help("Schedule the reboot (in seconds)")
+                 .default_value("1")
+            )
+            .arg(Arg::with_name("address")
+                 .multiple(true)
+                 .required(true)
+            )
         )
         .get_matches();
 
@@ -255,25 +318,36 @@ fn main() {
         Format::Short
     };
 
-    format.output(if let Some(matches) = matches.subcommand_matches("discover") {
-        let timeout = match matches.value_of("timeout").unwrap() {
-            "never" => None,
-            value => match value.parse::<u64>() {
-                Ok(n) => Some(Duration::from_secs(n)),
-                Err(_) => Some(Duration::from_secs(3)),
-            }
-        };
+    fn parse_seconds(value: &str, default: u64) -> Duration {
+        match value.parse::<u64>() {
+            Ok(n) => Duration::from_secs(n),
+            Err(_) => Duration::from_secs(default),
+        }
+    }
 
-        command_discover(timeout, format)
-    } else if let Some(matches) = matches.subcommand_matches("status") {
-        let addresses: Vec<SocketAddr> = matches.values_of("address").unwrap().into_iter().map(
+    fn parse_addresses(matches: &clap::ArgMatches) -> Vec<SocketAddr> {
+        matches.values_of("address").unwrap().into_iter().map(
             |addr| addr.parse().map_err(|_| ()).or_else(|_| -> Result<_, ()> {
                 Ok(SocketAddr::new(addr.parse().map_err(|_| ())?, 9999))
             }).expect(&format!("not a valid address: {}", addr))
-        ).collect();
+        ).collect()
+    }
 
-        command_status(addresses, format)
-    } else {
-        unreachable!()
+    format.output(match matches.subcommand() {
+        ("discover", Some(matches)) => {
+            let timeout = match matches.value_of("timeout").unwrap() {
+                "never" => None,
+                value => Some(parse_seconds(value, 3)),
+            };
+
+            command_discover(timeout, format)
+        },
+        ("status", Some(matches)) => {
+            command_status(parse_addresses(&matches), format)
+        },
+        ("reboot", Some(matches)) => {
+            command_reboot(parse_addresses(&matches), parse_seconds(matches.value_of("delay").unwrap(), 1), format)
+        },
+        _ => unreachable!()
     })
 }
