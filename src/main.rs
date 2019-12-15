@@ -193,6 +193,10 @@ impl Format {
                 ])
             },
             Format::Long => {
+                let (lat, lon) = device.location()
+                    .map(|(lat, lon)| (Some(lat), Some(lon)))
+                    .unwrap_or((None, None));
+
                 json!([
                     ["Address", addr],
                     ["MAC", sysinfo.mac],
@@ -202,17 +206,24 @@ impl Format {
                     ["Model", sysinfo.model],
                     ["Version", sysinfo.sw_ver],
                     ["Signal", format!("{} dB", sysinfo.rssi)],
+                    ["Latitude", lat],
+                    ["Longitude", lon],
                     ["Mode", sysinfo.active_mode],
                     ["On?", device_is_on(device)],
                 ])
             },
-            Format::JSON => json!({
-                "addr": addr,
-                "device": Self::device(device),
-                "data": {
-                    "system": sysinfo,
-                },
-            }),
+            Format::JSON => {
+                let location = device.location().ok();
+
+                json!({
+                    "addr": addr,
+                    "device": Self::device(device),
+                    "data": {
+                        "system": sysinfo,
+                        "location": location,
+                    },
+                })
+            },
         }
     }
 
