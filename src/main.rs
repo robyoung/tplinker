@@ -128,15 +128,15 @@ fn device_from_addr(addr: SocketAddr) -> TpResult<(SocketAddr, Device, SysInfo)>
 
     // Re-interpret as correct model
     let (dev, info) = if info.model.starts_with("HS100") {
-        let dev = unsafe { HS100::from_raw(raw) };
+        let dev = HS100::from_raw(raw);
         let info = dev.sysinfo()?;
         (Device::HS100(dev), info)
     } else if info.model.starts_with("HS110") {
-        let dev = unsafe { HS110::from_raw(raw) };
+        let dev = HS110::from_raw(raw);
         let info = dev.sysinfo()?;
         (Device::HS110(dev), info)
     } else if info.model.starts_with("LB110") {
-        let dev = unsafe { LB110::from_raw(raw) };
+        let dev = LB110::from_raw(raw);
         let info = dev.sysinfo()?;
         (Device::LB110(dev), info)
     } else {
