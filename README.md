@@ -64,8 +64,12 @@ traits from `capabilities`.
 
 ## CLI
 
-There is a very basic CLI that allows for discovery.
+There is a basic CLI:
 
 ```
-tplinker discover 
+tplinker discover
+
+tplinker status 192.168.1.2 192.168.1.3
+
+tplinker switch 192.168.1.4 on
 ```
