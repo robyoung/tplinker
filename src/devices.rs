@@ -1,13 +1,13 @@
 //! Structs for specific device models.
 //!
-//! ```
+//! ```no_run
 //! use tplinker::{
 //!   devices::LB110,
 //!   capabilities::{Switch, Dimmer},
 //! };
 //!
 //! let device = LB110::new("192.168.0.99:9999").unwrap();
-//! if device.is_on().unrwap() {
+//! if device.is_on().unwrap() {
 //!   let brightness = device.brightness().unwrap();
 //!   if brightness < 50 {
 //!     device.set_brightness(brightness + 20).unwrap();
@@ -31,12 +31,14 @@ use crate::{
 
 // DEVICES
 
+/// A raw, generic smart device
 pub struct RawDevice {
     addr: SocketAddr,
     protocol: Box<dyn Protocol>,
 }
 
 impl RawDevice {
+    /// Make a raw device from an address string
     pub fn new(addr: &str) -> result::Result<RawDevice, AddrParseError> {
         Ok(Self {
             addr: SocketAddr::from_str(addr)?,
@@ -44,6 +46,7 @@ impl RawDevice {
         })
     }
 
+    /// Make a raw device from an address struct
     pub fn from_addr(addr: SocketAddr) -> Self {
         Self {
             addr,
@@ -61,18 +64,39 @@ impl DeviceActions for RawDevice {
 }
 
 macro_rules! new_device {
-    ( $x:ident ) => {
+    ( $x:ident, $description:expr ) => {
+        new_device! {
+            $x
+            => main # concat!("A ", stringify!($x), " ", $description, "\n\nWhen directly creating a device using the `from_*` methods below, you must make sure that the address you pass is indeed that of a ", stringify!($x), ", as there is no further checking.")
+            => new # concat!("Make a ", stringify!($x), " device from an address string")
+            => raw # concat!("Make a ", stringify!($x), " device from an already constructed raw device")
+            => addr # concat!("Make a ", stringify!($x), " device from an address struct")
+        }
+    };
+    ( $x:ident
+      => main # $docmain:expr
+      => new # $docnew:expr
+      => raw # $docraw:expr
+      => addr # $docaddr:expr ) => {
+        #[doc = $docmain]
         pub struct $x {
             raw: RawDevice,
         }
 
         impl $x {
+            #[doc = $docnew]
             pub fn new(addr: &str) -> std::result::Result<Self, AddrParseError> {
                 Ok(Self {
                     raw: RawDevice::new(addr)?,
                 })
             }
 
+            #[doc = $docraw]
+            pub fn from_raw(raw: RawDevice) -> Self {
+                Self { raw }
+            }
+
+            #[doc = $docaddr]
             pub fn from_addr(addr: SocketAddr) -> Self {
                 Self {
                     raw: RawDevice::from_addr(addr),
@@ -88,16 +112,16 @@ macro_rules! new_device {
     };
 }
 
-new_device!(HS100);
+new_device!(HS100, "smart plug");
 
 impl Switch for HS100 {}
 
-new_device!(HS110);
+new_device!(HS110, "smart plug with energy monitoring");
 
 impl Switch for HS110 {}
 impl Emeter for HS110 {}
 
-new_device!(LB110);
+new_device!(LB110, "dimmable smart lightbulb");
 
 impl Switch for LB110 {
     fn is_on(&self) -> Result<bool> {
@@ -145,6 +169,17 @@ impl Device {
             Device::LB110(LB110::from_addr(addr))
         } else {
             Device::Unknown(RawDevice::from_addr(addr))
+        }
+    }
+}
+
+impl DeviceActions for Device {
+    fn send<T: DeserializeOwned>(&self, msg: &str) -> Result<T> {
+        match self {
+            Device::HS100(d) => d.send(msg),
+            Device::HS110(d) => d.send(msg),
+            Device::LB110(d) => d.send(msg),
+            Device::Unknown(d) => d.send(msg),
         }
     }
 }

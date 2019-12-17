@@ -43,14 +43,14 @@
 //! To connect to a specific TPLink device use the specific device struct from
 //! [`devices`](./devices/index.html).
 //!
-//! ```
+//! ```no_run
 //! use tplinker::{
 //!   devices::LB110,
 //!   capabilities::{Switch, Dimmer},
 //! };
 //!
 //! let device = LB110::new("192.168.0.99:9999").unwrap();
-//! if device.is_on().unrwap() {
+//! if device.is_on().unwrap() {
 //!   let brightness = device.brightness().unwrap();
 //!   if brightness < 50 {
 //!     device.set_brightness(brightness + 20).unwrap();

@@ -37,10 +37,10 @@ const QUERY: &str = r#"{
 }"#;
 
 /// Discover TPLink smart devices on the local network
-pub fn discover() -> Result<Vec<(SocketAddr, DeviceData)>> {
+pub fn with_timeout(timeout: Option<Duration>) -> Result<Vec<(SocketAddr, DeviceData)>> {
     let socket = UdpSocket::bind("0.0.0.0:0")?;
     socket.set_broadcast(true)?;
-    socket.set_read_timeout(Some(Duration::from_secs(3)))?;
+    socket.set_read_timeout(timeout)?;
 
     let req = protocol::encrypt(QUERY)?;
 
@@ -59,4 +59,11 @@ pub fn discover() -> Result<Vec<(SocketAddr, DeviceData)>> {
     }
 
     Ok(devices.into_iter().collect())
+}
+
+/// Discover TPLink smart devices on the local network
+///
+/// Uses the default timeout of 3 seconds.
+pub fn discover() -> Result<Vec<(SocketAddr, DeviceData)>> {
+    with_timeout(Some(Duration::from_secs(3)))
 }
