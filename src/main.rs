@@ -248,9 +248,14 @@ fn device_from_addr(addr: SocketAddr) -> TpResult<(SocketAddr, Device, SysInfo)>
     Ok((addr, dev, info))
 }
 
-fn pad(value: &str, padding: usize) -> String {
+fn lpad(value: &str, padding: usize) -> String {
     let pad = " ".repeat(padding.saturating_sub(value.len()));
     format!("{}{}", value, pad)
+}
+
+fn rpad(value: &str, padding: usize) -> String {
+    let pad = " ".repeat(padding.saturating_sub(value.len()));
+    format!("{}{}", pad, value)
 }
 
 fn device_is_on(device: &Device) -> Option<bool> {
@@ -271,18 +276,18 @@ fn toggle_switch<S: Switch>(switch: &S, state: &str) -> TpResult<bool> {
     }
 }
 
-fn human_stringify(value: &Value) -> String {
+fn human_stringify(value: &Value) -> (String, bool) {
     match value {
-        Value::Null => "-".to_string(),
-        Value::Bool(b) => b.to_string(),
-        Value::Number(n) => n.to_string(),
-        Value::String(s) => s.to_string(),
-        Value::Array(v) => v
+        Value::Null => ("-".to_string(), false),
+        Value::Bool(b) => (b.to_string(), false),
+        Value::Number(n) => (n.to_string(), true),
+        Value::String(s) => (s.to_string(), false),
+        Value::Array(v) => (v
             .iter()
-            .map(human_stringify)
+            .map(|v| human_stringify(v).0)
             .collect::<Vec<String>>()
-            .join(", "),
-        Value::Object(o) => stringify(o).unwrap(),
+            .join(", "), false),
+        Value::Object(o) => (stringify(o).unwrap(), false),
     }
 }
 
@@ -313,7 +318,7 @@ impl Format {
                 Format::Short | Format::Long => {
                     // field title -> (ordering, field width)
                     let mut fields: HashMap<String, (usize, usize)> = HashMap::new();
-                    let mut processed: Vec<HashMap<String, String>> =
+                    let mut processed: Vec<HashMap<String, (String, bool)>> =
                         Vec::with_capacity(rows.len());
 
                     for row in rows {
@@ -327,9 +332,9 @@ impl Format {
                             {
                                 let order_next = fields.len();
                                 let k = key.as_str().unwrap().to_string();
-                                let h = human_stringify(&value);
+                                let (h, align_right) = human_stringify(&value);
                                 let hlen = h.len().max(k.len());
-                                proc.insert(k.clone(), h);
+                                proc.insert(k.clone(), (h, align_right));
                                 fields
                                     .entry(k)
                                     .and_modify(|(_, len)| {
@@ -356,7 +361,7 @@ impl Format {
                         " {} ",
                         fields
                             .iter()
-                            .map(|(name, width)| pad(name, *width))
+                            .map(|(name, width)| lpad(name, *width))
                             .collect::<Vec<String>>()
                             .join(" | ")
                     ));
@@ -375,7 +380,11 @@ impl Format {
                             " {} ",
                             fields
                                 .iter()
-                                .map(|(name, width)| pad(row.get(name).unwrap(), *width))
+                                .map(|(name, width)| {
+                                    let (val, align_right) = row.get(name).unwrap();
+                                    if *align_right { rpad(val, *width) }
+                                    else { lpad(val, *width) }
+                                })
                                 .collect::<Vec<String>>()
                                 .join(" | ")
                         )
