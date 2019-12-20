@@ -225,6 +225,46 @@ pub trait Colour: Light {
     }
 }
 
+#[derive(Clone, Debug, Deserialize)]
+pub struct RealtimeEnergy {
+    /// Current in milli-amperes
+    #[serde(rename = "current_ma")]
+    pub current: usize,
+
+    /// Power in milliwatts
+    #[serde(rename = "power_mw")]
+    pub power: usize,
+
+    /// Total energy this week so far in watthours
+    #[serde(rename = "total_wh")]
+    pub total_energy: usize,
+
+    /// Voltage in millivolts
+    #[serde(rename = "voltage_mv")]
+    pub voltage: usize,
+}
+
+/// Total energy used on a particular day, in watthours
+#[derive(Clone, Debug, Deserialize)]
+pub struct DayEnergy {
+    pub year: u16,
+    pub month: u8,
+    pub day: u8,
+
+    #[serde(rename = "energy_wh")]
+    pub energy: usize,
+}
+
+/// Total energy used in a particular month, in watthours
+#[derive(Clone, Debug, Deserialize)]
+pub struct MonthEnergy {
+    pub year: u16,
+    pub month: u8,
+
+    #[serde(rename = "energy_wh")]
+    pub energy: usize,
+}
+
 /// Smart devices with energy usage tracking.
 pub trait Emeter: DeviceActions {
     /// Type of the emeter
@@ -235,32 +275,49 @@ pub trait Emeter: DeviceActions {
     }
 
     /// Get the realtime energy usage
-    // TODO: add proper return type
-    fn get_emeter_realtime(&self) -> Result<serde_json::Value> {
+    fn get_emeter_realtime(&self) -> Result<RealtimeEnergy> {
         let command = json!({
             self.emeter_type(): {"get_realtime": null}
         })
         .to_string();
-        Ok(self.send(&command)?)
+
+        #[derive(Deserialize)]
+        struct Emeter { pub emeter: Realtime }
+        #[derive(Deserialize)]
+        struct Realtime { pub get_realtime: RealtimeEnergy }
+        let rt: Emeter = self.send(&command)?;
+        Ok(rt.emeter.get_realtime)
     }
 
     /// Get the daily energy usage for a given month
-    // TODO: add proper return type
-    fn get_emeter_daily(&self, year: u16, month: u8) -> Result<serde_json::Value> {
+    fn get_emeter_daily(&self, year: u16, month: u8) -> Result<Vec<DayEnergy>> {
         let command = json!({
             self.emeter_type(): {"get_daystat": {"month": month, "year": year}}
         })
         .to_string();
-        Ok(self.send(&command)?)
+        #[derive(Deserialize)]
+        struct Emeter { pub emeter: Daystat }
+        #[derive(Deserialize)]
+        struct Daystat { pub get_daystat: Daylist }
+        #[derive(Deserialize)]
+        struct Daylist { pub day_list: Vec<DayEnergy> }
+        let rt: Emeter = self.send(&command)?;
+        Ok(rt.emeter.get_daystat.day_list)
     }
 
     /// Get the monthly energy usage for a given year
-    // TODO: add proper return type
-    fn get_emeter_monthly(&self, year: u16) -> Result<serde_json::Value> {
+    fn get_emeter_monthly(&self, year: u16) -> Result<Vec<MonthEnergy>> {
         let command = json!({
             self.emeter_type(): {"get_monthstat": {"year": year}}
         })
         .to_string();
-        Ok(self.send(&command)?)
+        #[derive(Deserialize)]
+        struct Emeter { pub emeter: Monthstat }
+        #[derive(Deserialize)]
+        struct Monthstat { pub get_monthstat: Monthlist }
+        #[derive(Deserialize)]
+        struct Monthlist { pub month_list: Vec<MonthEnergy> }
+        let rt: Emeter = self.send(&command)?;
+        Ok(rt.emeter.get_monthstat.month_list)
     }
 }
