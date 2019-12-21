@@ -282,9 +282,13 @@ pub trait Emeter: DeviceActions {
         .to_string();
 
         #[derive(Deserialize)]
-        struct Emeter { pub emeter: Realtime }
+        struct Emeter {
+            pub emeter: Realtime,
+        }
         #[derive(Deserialize)]
-        struct Realtime { pub get_realtime: RealtimeEnergy }
+        struct Realtime {
+            pub get_realtime: RealtimeEnergy,
+        }
         let rt: Emeter = self.send(&command)?;
         Ok(rt.emeter.get_realtime)
     }
@@ -296,11 +300,17 @@ pub trait Emeter: DeviceActions {
         })
         .to_string();
         #[derive(Deserialize)]
-        struct Emeter { pub emeter: Daystat }
+        struct Emeter {
+            pub emeter: Daystat,
+        }
         #[derive(Deserialize)]
-        struct Daystat { pub get_daystat: Daylist }
+        struct Daystat {
+            pub get_daystat: Daylist,
+        }
         #[derive(Deserialize)]
-        struct Daylist { pub day_list: Vec<DayEnergy> }
+        struct Daylist {
+            pub day_list: Vec<DayEnergy>,
+        }
         let rt: Emeter = self.send(&command)?;
         Ok(rt.emeter.get_daystat.day_list)
     }
@@ -312,11 +322,17 @@ pub trait Emeter: DeviceActions {
         })
         .to_string();
         #[derive(Deserialize)]
-        struct Emeter { pub emeter: Monthstat }
+        struct Emeter {
+            pub emeter: Monthstat,
+        }
         #[derive(Deserialize)]
-        struct Monthstat { pub get_monthstat: Monthlist }
+        struct Monthstat {
+            pub get_monthstat: Monthlist,
+        }
         #[derive(Deserialize)]
-        struct Monthlist { pub month_list: Vec<MonthEnergy> }
+        struct Monthlist {
+            pub month_list: Vec<MonthEnergy>,
+        }
         let rt: Emeter = self.send(&command)?;
         Ok(rt.emeter.get_monthstat.month_list)
     }

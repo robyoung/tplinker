@@ -1,9 +1,4 @@
-use std::{
-    net::SocketAddr,
-    rc::Rc,
-    str::FromStr,
-    time::Duration,
-};
+use std::{net::SocketAddr, rc::Rc, str::FromStr, time::Duration};
 
 use clap::{App, AppSettings, Arg, SubCommand};
 use serde_json::{json, to_string as stringify, Value};
@@ -127,7 +122,11 @@ fn command_switch_toggle(addr: SocketAddr, state: &str, format: Format) -> Vec<V
         })
 }
 
-fn command_energy(addresses: Vec<SocketAddr>, times: Vec<TimeRequest>, format: Format) -> Vec<Value> {
+fn command_energy(
+    addresses: Vec<SocketAddr>,
+    times: Vec<TimeRequest>,
+    format: Format,
+) -> Vec<Value> {
     #[derive(Debug)]
     struct Tables {
         pub errors: Vec<(Rc<SocketAddr>, Option<TimeRequest>, String)>,
@@ -145,44 +144,64 @@ fn command_energy(addresses: Vec<SocketAddr>, times: Vec<TimeRequest>, format: F
         monthly: Vec::new(),
     };
 
-    fn harvest_energy_info<D: Emeter>(tables: &mut Tables, addr: Rc<SocketAddr>, device: D, sys: Rc<SysInfo>, times: &[TimeRequest]) {
+    fn harvest_energy_info<D: Emeter>(
+        tables: &mut Tables,
+        addr: Rc<SocketAddr>,
+        device: D,
+        sys: Rc<SysInfo>,
+        times: &[TimeRequest],
+    ) {
         for time in times {
             match time {
-                TimeRequest::Realtime => {
-                    match device.get_emeter_realtime() {
-                        Err(err) => {
-                            tables.errors.push((addr.clone(), Some(time.clone()), err.to_string()));
-                        },
-                        Ok(energy) => {
-                            tables.realtime.push((addr.clone(), sys.clone(), energy));
-                        }
+                TimeRequest::Realtime => match device.get_emeter_realtime() {
+                    Err(err) => {
+                        tables
+                            .errors
+                            .push((addr.clone(), Some(time.clone()), err.to_string()));
                     }
-
-                }
+                    Ok(energy) => {
+                        tables.realtime.push((addr.clone(), sys.clone(), energy));
+                    }
+                },
                 TimeRequest::Daily { year, month } => {
                     match device.get_emeter_daily(*year, *month) {
                         Err(err) => {
-                            tables.errors.push((addr.clone(), Some(time.clone()), err.to_string()));
-                        },
+                            tables
+                                .errors
+                                .push((addr.clone(), Some(time.clone()), err.to_string()));
+                        }
                         Ok(days) => {
                             for d in days {
-                                tables.daily.push((addr.clone(), sys.clone(), d.year, d.month, d.day, d.energy));
+                                tables.daily.push((
+                                    addr.clone(),
+                                    sys.clone(),
+                                    d.year,
+                                    d.month,
+                                    d.day,
+                                    d.energy,
+                                ));
                             }
                         }
                     }
                 }
-                TimeRequest::Monthly { year } => {
-                    match device.get_emeter_monthly(*year) {
-                        Err(err) => {
-                            tables.errors.push((addr.clone(), Some(time.clone()), err.to_string()));
-                        },
-                        Ok(months) => {
-                            for m in months {
-                                tables.monthly.push((addr.clone(), sys.clone(), m.year, m.month, m.energy));
-                            }
+                TimeRequest::Monthly { year } => match device.get_emeter_monthly(*year) {
+                    Err(err) => {
+                        tables
+                            .errors
+                            .push((addr.clone(), Some(time.clone()), err.to_string()));
+                    }
+                    Ok(months) => {
+                        for m in months {
+                            tables.monthly.push((
+                                addr.clone(),
+                                sys.clone(),
+                                m.year,
+                                m.month,
+                                m.energy,
+                            ));
                         }
                     }
-                }
+                },
             }
         }
     }
@@ -194,9 +213,11 @@ fn command_energy(addresses: Vec<SocketAddr>, times: Vec<TimeRequest>, format: F
             match dev {
                 Device::HS110(d) => {
                     harvest_energy_info(&mut tables, addr, d, sys, &times);
-                },
+                }
                 _ => {
-                    tables.errors.push((addr, None, "Not an energy-monitoring device".into()));
+                    tables
+                        .errors
+                        .push((addr, None, "Not an energy-monitoring device".into()));
                 }
             }
         }
@@ -206,20 +227,42 @@ fn command_energy(addresses: Vec<SocketAddr>, times: Vec<TimeRequest>, format: F
         eprintln!("Error retrieving {:?} energy for {}: {}", time, addr, err);
     }
 
-    if format != Format::JSON && !tables.realtime.is_empty() { println!("\n== Current energy use:"); }
-    format.output(tables.realtime.into_iter().map(|(addr, sys, energy)|
-        format.energy_realtime(addr, sys, energy)
-    ).collect());
+    if format != Format::JSON && !tables.realtime.is_empty() {
+        println!("\n== Current energy use:");
+    }
+    format.output(
+        tables
+            .realtime
+            .into_iter()
+            .map(|(addr, sys, energy)| format.energy_realtime(addr, sys, energy))
+            .collect(),
+    );
 
-    if format != Format::JSON && !tables.monthly.is_empty() { println!("\n== Monthly energy use:"); }
-    format.output(tables.monthly.into_iter().map(|(addr, sys, year, month, energy)|
-        format.energy_monthly(addr, sys, year, month, energy)
-    ).collect());
+    if format != Format::JSON && !tables.monthly.is_empty() {
+        println!("\n== Monthly energy use:");
+    }
+    format.output(
+        tables
+            .monthly
+            .into_iter()
+            .map(|(addr, sys, year, month, energy)| {
+                format.energy_monthly(addr, sys, year, month, energy)
+            })
+            .collect(),
+    );
 
-    if format != Format::JSON && !tables.daily.is_empty() { println!("\n== Daily energy use:"); }
-    format.output(tables.daily.into_iter().map(|(addr, sys, year, month, day, energy)|
-        format.energy_daily(addr, sys, year, month, day, energy)
-    ).collect());
+    if format != Format::JSON && !tables.daily.is_empty() {
+        println!("\n== Daily energy use:");
+    }
+    format.output(
+        tables
+            .daily
+            .into_iter()
+            .map(|(addr, sys, year, month, day, energy)| {
+                format.energy_daily(addr, sys, year, month, day, energy)
+            })
+            .collect(),
+    );
 
     Vec::new()
 }
@@ -282,11 +325,13 @@ fn human_stringify(value: &Value) -> (String, bool) {
         Value::Bool(b) => (b.to_string(), false),
         Value::Number(n) => (n.to_string(), true),
         Value::String(s) => (s.to_string(), false),
-        Value::Array(v) => (v
-            .iter()
-            .map(|v| human_stringify(v).0)
-            .collect::<Vec<String>>()
-            .join(", "), false),
+        Value::Array(v) => (
+            v.iter()
+                .map(|v| human_stringify(v).0)
+                .collect::<Vec<String>>()
+                .join(", "),
+            false,
+        ),
         Value::Object(o) => (stringify(o).unwrap(), false),
     }
 }
@@ -309,7 +354,9 @@ impl Format {
     fn output(self, rows: Vec<Value>) {
         use std::collections::HashMap;
 
-        if rows.is_empty() { return; }
+        if rows.is_empty() {
+            return;
+        }
 
         println!(
             "{}",
@@ -382,8 +429,11 @@ impl Format {
                                 .iter()
                                 .map(|(name, width)| {
                                     let (val, align_right) = row.get(name).unwrap();
-                                    if *align_right { rpad(val, *width) }
-                                    else { lpad(val, *width) }
+                                    if *align_right {
+                                        rpad(val, *width)
+                                    } else {
+                                        lpad(val, *width)
+                                    }
                                 })
                                 .collect::<Vec<String>>()
                                 .join(" | ")
@@ -493,7 +543,12 @@ impl Format {
         }
     }
 
-    fn energy_realtime(self, addr: Rc<SocketAddr>, sysinfo: Rc<SysInfo>, energy: RealtimeEnergy) -> Value {
+    fn energy_realtime(
+        self,
+        addr: Rc<SocketAddr>,
+        sysinfo: Rc<SysInfo>,
+        energy: RealtimeEnergy,
+    ) -> Value {
         match self {
             Format::Short => json!([
                 ["Address", addr.to_string()],
@@ -508,23 +563,29 @@ impl Format {
                 ["Power (mW)", energy.power],
                 ["This week (Wh)", energy.total_energy],
             ]),
-            Format::JSON => {
-                json!({
-                    "addr": addr.to_string(),
-                    "alias": sysinfo.alias,
-                    "energy": {
-                        "date": "current",
-                        "current_ma": energy.current,
-                        "voltage_mv": energy.voltage,
-                        "power_mw": energy.power,
-                        "week_so_far_power_wh": energy.total_energy,
-                    },
-                })
-            }
+            Format::JSON => json!({
+                "addr": addr.to_string(),
+                "alias": sysinfo.alias,
+                "energy": {
+                    "date": "current",
+                    "current_ma": energy.current,
+                    "voltage_mv": energy.voltage,
+                    "power_mw": energy.power,
+                    "week_so_far_power_wh": energy.total_energy,
+                },
+            }),
         }
     }
 
-    fn energy_daily(self, addr: Rc<SocketAddr>, sysinfo: Rc<SysInfo>, year: u16, month: u8, day: u8, energy: usize) -> Value {
+    fn energy_daily(
+        self,
+        addr: Rc<SocketAddr>,
+        sysinfo: Rc<SysInfo>,
+        year: u16,
+        month: u8,
+        day: u8,
+        energy: usize,
+    ) -> Value {
         let date = format!("{:04}-{:02}-{:02}", year, month, day);
         match self {
             Format::Short | Format::Long => json!([
@@ -533,20 +594,25 @@ impl Format {
                 ["Date", date],
                 ["Energy (Wh)", energy],
             ]),
-            Format::JSON => {
-                json!({
-                    "addr": addr.to_string(),
-                    "alias": sysinfo.alias,
-                    "energy": {
-                        "date": date,
-                        "wh": energy,
-                    },
-                })
-            }
+            Format::JSON => json!({
+                "addr": addr.to_string(),
+                "alias": sysinfo.alias,
+                "energy": {
+                    "date": date,
+                    "wh": energy,
+                },
+            }),
         }
     }
 
-    fn energy_monthly(self, addr: Rc<SocketAddr>, sysinfo: Rc<SysInfo>, year: u16, month: u8, energy: usize) -> Value {
+    fn energy_monthly(
+        self,
+        addr: Rc<SocketAddr>,
+        sysinfo: Rc<SysInfo>,
+        year: u16,
+        month: u8,
+        energy: usize,
+    ) -> Value {
         let date = format!("{:04}-{:02}", year, month);
         match self {
             Format::Short | Format::Long => json!([
@@ -555,19 +621,16 @@ impl Format {
                 ["Month", date],
                 ["Energy (Wh)", energy],
             ]),
-            Format::JSON => {
-                json!({
-                    "addr": addr.to_string(),
-                    "alias": sysinfo.alias,
-                    "energy": {
-                        "month": date,
-                        "wh": energy,
-                    },
-                })
-            }
+            Format::JSON => json!({
+                "addr": addr.to_string(),
+                "alias": sysinfo.alias,
+                "energy": {
+                    "month": date,
+                    "wh": energy,
+                },
+            }),
         }
     }
-
 
     fn device(device: &Device) -> &'static str {
         match device {
@@ -732,17 +795,25 @@ fn main() {
 
     fn parse_year_month(val: &str) -> Result<(u16, u8), String> {
         let ym = val.split("-").collect::<Vec<&str>>();
-        if ym.len() != 2 { return Err("cannot split in two by '-'".into()); }
+        if ym.len() != 2 {
+            return Err("cannot split in two by '-'".into());
+        }
         let year = u16::from_str(ym[0]).map_err(|err| format!("year: {}", err))?;
         let month = u8::from_str(ym[1]).map_err(|err| format!("month: {}", err))?;
-        if year < 2000 || year > 2100 { return Err("year out of bounds".into()); }
-        if month < 1 || month > 12 { return Err("month out of bounds".into()); }
+        if year < 2000 || year > 2100 {
+            return Err("year out of bounds".into());
+        }
+        if month < 1 || month > 12 {
+            return Err("month out of bounds".into());
+        }
         Ok((year, month))
     }
 
     fn parse_year(val: &str) -> Result<u16, String> {
         let year = u16::from_str(&val).map_err(|err| err.to_string())?;
-        if year < 2000 || year > 2100 { return Err("out of bounds".into()); }
+        if year < 2000 || year > 2100 {
+            return Err("out of bounds".into());
+        }
         Ok(year)
     }
 
