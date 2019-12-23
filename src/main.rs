@@ -1,10 +1,10 @@
-use std::{net::SocketAddr, time::Duration};
+use std::{net::SocketAddr, rc::Rc, str::FromStr, time::Duration};
 
 use clap::{App, AppSettings, Arg, SubCommand};
 use serde_json::{json, to_string as stringify, Value};
 
 use tplinker::{
-    capabilities::{DeviceActions, Switch},
+    capabilities::{DeviceActions, Emeter, RealtimeEnergy, Switch},
     datatypes::{DeviceData, SysInfo},
     devices::{Device, RawDevice, HS100, HS110, LB110},
     error::Result as TpResult,
@@ -122,6 +122,151 @@ fn command_switch_toggle(addr: SocketAddr, state: &str, format: Format) -> Vec<V
         })
 }
 
+fn command_energy(
+    addresses: Vec<SocketAddr>,
+    times: Vec<TimeRequest>,
+    format: Format,
+) -> Vec<Value> {
+    #[derive(Debug)]
+    struct Tables {
+        pub errors: Vec<(Rc<SocketAddr>, Option<TimeRequest>, String)>,
+        pub realtime: Vec<(Rc<SocketAddr>, Rc<SysInfo>, RealtimeEnergy)>,
+        //                                           y    m   d
+        pub daily: Vec<(Rc<SocketAddr>, Rc<SysInfo>, u16, u8, u8, usize)>,
+        //                                             y    m
+        pub monthly: Vec<(Rc<SocketAddr>, Rc<SysInfo>, u16, u8, usize)>,
+    }
+
+    let mut tables = Tables {
+        errors: Vec::new(),
+        realtime: Vec::new(),
+        daily: Vec::new(),
+        monthly: Vec::new(),
+    };
+
+    fn harvest_energy_info<D: Emeter>(
+        tables: &mut Tables,
+        addr: Rc<SocketAddr>,
+        device: D,
+        sys: Rc<SysInfo>,
+        times: &[TimeRequest],
+    ) {
+        for time in times {
+            match time {
+                TimeRequest::Realtime => match device.get_emeter_realtime() {
+                    Err(err) => {
+                        tables
+                            .errors
+                            .push((addr.clone(), Some(time.clone()), err.to_string()));
+                    }
+                    Ok(energy) => {
+                        tables.realtime.push((addr.clone(), sys.clone(), energy));
+                    }
+                },
+                TimeRequest::Daily { year, month } => {
+                    match device.get_emeter_daily(*year, *month) {
+                        Err(err) => {
+                            tables
+                                .errors
+                                .push((addr.clone(), Some(time.clone()), err.to_string()));
+                        }
+                        Ok(days) => {
+                            for d in days {
+                                tables.daily.push((
+                                    addr.clone(),
+                                    sys.clone(),
+                                    d.year,
+                                    d.month,
+                                    d.day,
+                                    d.energy,
+                                ));
+                            }
+                        }
+                    }
+                }
+                TimeRequest::Monthly { year } => match device.get_emeter_monthly(*year) {
+                    Err(err) => {
+                        tables
+                            .errors
+                            .push((addr.clone(), Some(time.clone()), err.to_string()));
+                    }
+                    Ok(months) => {
+                        for m in months {
+                            tables.monthly.push((
+                                addr.clone(),
+                                sys.clone(),
+                                m.year,
+                                m.month,
+                                m.energy,
+                            ));
+                        }
+                    }
+                },
+            }
+        }
+    }
+
+    for addr in addresses {
+        if let Ok((addr, dev, sys)) = device_from_addr(addr).map_err(|err| err.to_string()) {
+            let addr = Rc::new(addr);
+            let sys = Rc::new(sys);
+            match dev {
+                Device::HS110(d) => {
+                    harvest_energy_info(&mut tables, addr, d, sys, &times);
+                }
+                _ => {
+                    tables
+                        .errors
+                        .push((addr, None, "Not an energy-monitoring device".into()));
+                }
+            }
+        }
+    }
+
+    for (addr, time, err) in tables.errors {
+        eprintln!("Error retrieving {:?} energy for {}: {}", time, addr, err);
+    }
+
+    if format != Format::JSON && !tables.realtime.is_empty() {
+        println!("\n== Current energy use:");
+    }
+    format.output(
+        tables
+            .realtime
+            .into_iter()
+            .map(|(addr, sys, energy)| format.energy_realtime(addr, sys, energy))
+            .collect(),
+    );
+
+    if format != Format::JSON && !tables.monthly.is_empty() {
+        println!("\n== Monthly energy use:");
+    }
+    format.output(
+        tables
+            .monthly
+            .into_iter()
+            .map(|(addr, sys, year, month, energy)| {
+                format.energy_monthly(addr, sys, year, month, energy)
+            })
+            .collect(),
+    );
+
+    if format != Format::JSON && !tables.daily.is_empty() {
+        println!("\n== Daily energy use:");
+    }
+    format.output(
+        tables
+            .daily
+            .into_iter()
+            .map(|(addr, sys, year, month, day, energy)| {
+                format.energy_daily(addr, sys, year, month, day, energy)
+            })
+            .collect(),
+    );
+
+    Vec::new()
+}
+
 fn device_from_addr(addr: SocketAddr) -> TpResult<(SocketAddr, Device, SysInfo)> {
     let raw = RawDevice::from_addr(addr);
     let info = raw.sysinfo()?;
@@ -146,9 +291,14 @@ fn device_from_addr(addr: SocketAddr) -> TpResult<(SocketAddr, Device, SysInfo)>
     Ok((addr, dev, info))
 }
 
-fn pad(value: &str, padding: usize) -> String {
+fn lpad(value: &str, padding: usize) -> String {
     let pad = " ".repeat(padding.saturating_sub(value.len()));
     format!("{}{}", value, pad)
+}
+
+fn rpad(value: &str, padding: usize) -> String {
+    let pad = " ".repeat(padding.saturating_sub(value.len()));
+    format!("{}{}", pad, value)
 }
 
 fn device_is_on(device: &Device) -> Option<bool> {
@@ -169,22 +319,31 @@ fn toggle_switch<S: Switch>(switch: &S, state: &str) -> TpResult<bool> {
     }
 }
 
-fn human_stringify(value: &Value) -> String {
+fn human_stringify(value: &Value) -> (String, bool) {
     match value {
-        Value::Null => "-".to_string(),
-        Value::Bool(b) => b.to_string(),
-        Value::Number(n) => n.to_string(),
-        Value::String(s) => s.to_string(),
-        Value::Array(v) => v
-            .iter()
-            .map(human_stringify)
-            .collect::<Vec<String>>()
-            .join(", "),
-        Value::Object(o) => stringify(o).unwrap(),
+        Value::Null => ("-".to_string(), false),
+        Value::Bool(b) => (b.to_string(), false),
+        Value::Number(n) => (n.to_string(), true),
+        Value::String(s) => (s.to_string(), false),
+        Value::Array(v) => (
+            v.iter()
+                .map(|v| human_stringify(v).0)
+                .collect::<Vec<String>>()
+                .join(", "),
+            false,
+        ),
+        Value::Object(o) => (stringify(o).unwrap(), false),
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
+enum TimeRequest {
+    Realtime,
+    Daily { year: u16, month: u8 },
+    Monthly { year: u16 },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Format {
     Short,
     Long,
@@ -195,6 +354,10 @@ impl Format {
     fn output(self, rows: Vec<Value>) {
         use std::collections::HashMap;
 
+        if rows.is_empty() {
+            return;
+        }
+
         println!(
             "{}",
             match self {
@@ -202,7 +365,7 @@ impl Format {
                 Format::Short | Format::Long => {
                     // field title -> (ordering, field width)
                     let mut fields: HashMap<String, (usize, usize)> = HashMap::new();
-                    let mut processed: Vec<HashMap<String, String>> =
+                    let mut processed: Vec<HashMap<String, (String, bool)>> =
                         Vec::with_capacity(rows.len());
 
                     for row in rows {
@@ -216,9 +379,9 @@ impl Format {
                             {
                                 let order_next = fields.len();
                                 let k = key.as_str().unwrap().to_string();
-                                let h = human_stringify(&value);
+                                let (h, align_right) = human_stringify(&value);
                                 let hlen = h.len().max(k.len());
-                                proc.insert(k.clone(), h);
+                                proc.insert(k.clone(), (h, align_right));
                                 fields
                                     .entry(k)
                                     .and_modify(|(_, len)| {
@@ -245,7 +408,7 @@ impl Format {
                         " {} ",
                         fields
                             .iter()
-                            .map(|(name, width)| pad(name, *width))
+                            .map(|(name, width)| lpad(name, *width))
                             .collect::<Vec<String>>()
                             .join(" | ")
                     ));
@@ -264,7 +427,14 @@ impl Format {
                             " {} ",
                             fields
                                 .iter()
-                                .map(|(name, width)| pad(row.get(name).unwrap(), *width))
+                                .map(|(name, width)| {
+                                    let (val, align_right) = row.get(name).unwrap();
+                                    if *align_right {
+                                        rpad(val, *width)
+                                    } else {
+                                        lpad(val, *width)
+                                    }
+                                })
                                 .collect::<Vec<String>>()
                                 .join(" | ")
                         )
@@ -280,7 +450,7 @@ impl Format {
         match self {
             Format::JSON => json!({
                 "addr": addr,
-                "device": Self::device(device),
+                "device": Self::device(&device),
                 "data": data,
             }),
             rest => rest.status(addr, device, data.sysinfo()),
@@ -323,7 +493,7 @@ impl Format {
 
                 json!({
                     "addr": addr,
-                    "device": Self::device(device),
+                    "device": Self::device(&device),
                     "data": {
                         "system": sysinfo,
                         "location": location,
@@ -365,7 +535,7 @@ impl Format {
                     "action": action,
                     "result": result,
                 },
-                "device": Self::device(device),
+                "device": Self::device(&device),
                 "data": {
                     "system": sysinfo,
                 },
@@ -373,7 +543,96 @@ impl Format {
         }
     }
 
-    fn device(device: Device) -> &'static str {
+    fn energy_realtime(
+        self,
+        addr: Rc<SocketAddr>,
+        sysinfo: Rc<SysInfo>,
+        energy: RealtimeEnergy,
+    ) -> Value {
+        match self {
+            Format::Short => json!([
+                ["Address", addr.to_string()],
+                ["Alias", sysinfo.alias],
+                ["Power (mW)", energy.power],
+            ]),
+            Format::Long => json!([
+                ["Address", addr.to_string()],
+                ["Alias", sysinfo.alias],
+                ["Current (mA)", energy.current],
+                ["Voltage (mV)", energy.voltage],
+                ["Power (mW)", energy.power],
+                ["This week (Wh)", energy.total_energy],
+            ]),
+            Format::JSON => json!({
+                "addr": addr.to_string(),
+                "alias": sysinfo.alias,
+                "energy": {
+                    "date": "current",
+                    "current_ma": energy.current,
+                    "voltage_mv": energy.voltage,
+                    "power_mw": energy.power,
+                    "week_so_far_power_wh": energy.total_energy,
+                },
+            }),
+        }
+    }
+
+    fn energy_daily(
+        self,
+        addr: Rc<SocketAddr>,
+        sysinfo: Rc<SysInfo>,
+        year: u16,
+        month: u8,
+        day: u8,
+        energy: usize,
+    ) -> Value {
+        let date = format!("{:04}-{:02}-{:02}", year, month, day);
+        match self {
+            Format::Short | Format::Long => json!([
+                ["Address", addr.to_string()],
+                ["Alias", sysinfo.alias],
+                ["Date", date],
+                ["Energy (Wh)", energy],
+            ]),
+            Format::JSON => json!({
+                "addr": addr.to_string(),
+                "alias": sysinfo.alias,
+                "energy": {
+                    "date": date,
+                    "wh": energy,
+                },
+            }),
+        }
+    }
+
+    fn energy_monthly(
+        self,
+        addr: Rc<SocketAddr>,
+        sysinfo: Rc<SysInfo>,
+        year: u16,
+        month: u8,
+        energy: usize,
+    ) -> Value {
+        let date = format!("{:04}-{:02}", year, month);
+        match self {
+            Format::Short | Format::Long => json!([
+                ["Address", addr.to_string()],
+                ["Alias", sysinfo.alias],
+                ["Month", date],
+                ["Energy (Wh)", energy],
+            ]),
+            Format::JSON => json!({
+                "addr": addr.to_string(),
+                "alias": sysinfo.alias,
+                "energy": {
+                    "month": date,
+                    "wh": energy,
+                },
+            }),
+        }
+    }
+
+    fn device(device: &Device) -> &'static str {
         match device {
             Device::HS100(_) => "HS100",
             Device::HS110(_) => "HS110",
@@ -415,7 +674,12 @@ fn main() {
         .subcommand(
             SubCommand::with_name("status")
                 .about("Given device addresses, return info + status")
-                .arg(Arg::with_name("address").multiple(true).required(true)),
+                .arg(
+                    Arg::with_name("address")
+                        .multiple(true)
+                        .required(true)
+                        .validator(|val| check_address(&val).and(Ok(())))
+                ),
         )
         .subcommand(
             SubCommand::with_name("reboot")
@@ -425,25 +689,68 @@ fn main() {
                         .long("delay")
                         .takes_value(true)
                         .help("Schedule the reboot (in seconds)")
-                        .default_value("1"),
+                        .default_value("1")
+                        .validator(|val| u64::from_str(&val).and(Ok(())).map_err(|err| err.to_string())),
                 )
-                .arg(Arg::with_name("address").multiple(true).required(true)),
+                .arg(
+                    Arg::with_name("address")
+                        .multiple(true)
+                        .required(true)
+                        .validator(|val| check_address(&val).and(Ok(())))
+                ),
         )
         .subcommand(
             SubCommand::with_name("set-alias")
                 .about("Rename a device")
-                .arg(Arg::with_name("address").required(true))
+                .arg(
+                    Arg::with_name("address")
+                        .required(true)
+                        .validator(|val| check_address(&val).and(Ok(())))
+                )
                 .arg(Arg::with_name("alias").required(true)),
         )
         .subcommand(
             SubCommand::with_name("switch")
                 .about("Toggle a switchable device")
-                .arg(Arg::with_name("address").required(true))
+                .arg(
+                    Arg::with_name("address")
+                        .required(true)
+                        .validator(|val| check_address(&val).and(Ok(())))
+                )
                 .arg(
                     Arg::with_name("state")
                         .possible_values(&["on", "off", "toggle"])
                         .default_value("toggle")
                         .required(true),
+                ),
+        )
+        .subcommand(
+            SubCommand::with_name("energy")
+                .about("Query energy-monitoring devices")
+                .arg(Arg::with_name("now")
+                    .long("now")
+                    .takes_value(false)
+                    .help("Retrieve the current realtime energy use (default if no other option provided)")
+                )
+                .arg(Arg::with_name("daily")
+                    .long("daily")
+                    .takes_value(true)
+                    .multiple(true)
+                    .help("Retrieve the daily energy use for the given month (YYYY-MM)")
+                    .validator(|val| parse_year_month(&val).and(Ok(())))
+                )
+                .arg(Arg::with_name("monthly")
+                    .long("monthly")
+                    .takes_value(true)
+                    .multiple(true)
+                    .help("Retrieve the monthly energy use for the given year (YYYY)")
+                    .validator(|val| parse_year(&val).and(Ok(())))
+                )
+                .arg(
+                    Arg::with_name("address")
+                        .multiple(true)
+                        .required(true)
+                        .validator(|val| check_address(&val).and(Ok(())))
                 ),
         )
         .get_matches();
@@ -463,13 +770,18 @@ fn main() {
         }
     }
 
-    fn parse_address(addr: &str) -> SocketAddr {
+    fn check_address(addr: &str) -> Result<SocketAddr, String> {
         addr.parse()
             .map_err(|_| ())
             .or_else(|_| -> Result<_, ()> {
                 Ok(SocketAddr::new(addr.parse().map_err(|_| ())?, 9999))
             })
-            .expect(&format!("not a valid address: {}", addr))
+            .map_err(|_| "not an IP address or IP:port pair".into())
+    }
+
+    fn parse_address(addr: &str) -> SocketAddr {
+        // okay to unwrap as all will have been checked by clap
+        check_address(addr).unwrap()
     }
 
     fn parse_addresses(matches: &clap::ArgMatches) -> Vec<SocketAddr> {
@@ -479,6 +791,30 @@ fn main() {
             .into_iter()
             .map(parse_address)
             .collect()
+    }
+
+    fn parse_year_month(val: &str) -> Result<(u16, u8), String> {
+        let ym = val.split("-").collect::<Vec<&str>>();
+        if ym.len() != 2 {
+            return Err("cannot split in two by '-'".into());
+        }
+        let year = u16::from_str(ym[0]).map_err(|err| format!("year: {}", err))?;
+        let month = u8::from_str(ym[1]).map_err(|err| format!("month: {}", err))?;
+        if year < 2000 || year > 2100 {
+            return Err("year out of bounds".into());
+        }
+        if month < 1 || month > 12 {
+            return Err("month out of bounds".into());
+        }
+        Ok((year, month))
+    }
+
+    fn parse_year(val: &str) -> Result<u16, String> {
+        let year = u16::from_str(&val).map_err(|err| err.to_string())?;
+        if year < 2000 || year > 2100 {
+            return Err("out of bounds".into());
+        }
+        Ok(year)
     }
 
     format.output(match matches.subcommand() {
@@ -505,6 +841,31 @@ fn main() {
             let address = parse_address(matches.value_of("address").unwrap());
             let state = matches.value_of("state").unwrap();
             command_switch_toggle(address, state, format)
+        }
+        ("energy", Some(matches)) => {
+            let addresses = parse_addresses(&matches);
+
+            let mut timerequests = Vec::new();
+
+            if let Some(dailies) = matches.values_of("daily") {
+                for daily in dailies {
+                    let (year, month) = parse_year_month(daily).unwrap();
+                    timerequests.push(TimeRequest::Daily { year, month });
+                }
+            }
+
+            if let Some(monthlies) = matches.values_of("monthly") {
+                for monthly in monthlies {
+                    let year = parse_year(monthly).unwrap();
+                    timerequests.push(TimeRequest::Monthly { year });
+                }
+            }
+
+            if matches.is_present("now") || timerequests.is_empty() {
+                timerequests.push(TimeRequest::Realtime);
+            }
+
+            command_energy(addresses, timerequests, format)
         }
         _ => unreachable!(),
     })
