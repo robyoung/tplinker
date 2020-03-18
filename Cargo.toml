@@ -2,7 +2,7 @@
 name = "tplinker"
 description = "Interface to TPLink smart devices such as HS100, HS110 and LB110"
 repository = "https://github.com/robyoung/tplinker"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["Rob Young <rob@robyoung.digital>"]
 edition = "2018"
 license = "MIT"
