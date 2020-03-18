@@ -14,7 +14,11 @@ pub struct DeviceData {
 }
 
 impl DeviceData {
-    pub fn sysinfo(self) -> SysInfo {
+    pub fn sysinfo(&self) -> &SysInfo {
+        &self.system.sysinfo
+    }
+
+    pub fn into_sysinfo(self) -> SysInfo {
         self.system.sysinfo
     }
 }
@@ -565,7 +569,7 @@ pub mod tests {
     fn deserialise_lb110_off() {
         let result = serde_json::from_str::<DeviceData>(&LB110_JSON_OFF).unwrap();
 
-        let sysinfo = result.clone().sysinfo();
+        let sysinfo = result.sysinfo();
         assert_eq!(sysinfo.hw_ver, "1.0");
         assert_eq!(sysinfo.model, "LB110(EU)");
         assert_eq!(
@@ -594,7 +598,7 @@ pub mod tests {
     fn deserialise_lb110_on() {
         let result = serde_json::from_str::<DeviceData>(&LB110_JSON_ON).unwrap();
 
-        let sysinfo = result.clone().sysinfo();
+        let sysinfo = result.sysinfo();
         assert_eq!(sysinfo.hw_ver, "1.0");
         assert_eq!(sysinfo.model, "LB110(EU)");
         assert_eq!(

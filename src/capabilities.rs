@@ -26,7 +26,7 @@ pub trait DeviceActions {
     fn sysinfo(&self) -> Result<SysInfo> {
         Ok(self
             .send::<DeviceData>(r#"{"system":{"get_sysinfo":null}}"#)?
-            .sysinfo())
+            .into_sysinfo())
     }
 
     /// Get the alias of the device

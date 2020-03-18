@@ -27,7 +27,7 @@ fn command_status(addresses: Vec<SocketAddr>, format: Format) -> Vec<Value> {
         .into_par_iter()
         .filter_map(|addr| {
             device_from_addr(addr)
-                .map(|(addr, dev, info)| format.status(addr, dev, info))
+                .map(|(addr, dev, info)| format.status(addr, dev, &info))
                 .map_err(|err| eprintln!("While querying {}: {}", addr, err))
                 .ok()
         })
@@ -287,7 +287,7 @@ impl Format {
         }
     }
 
-    fn status(self, addr: SocketAddr, device: Device, sysinfo: SysInfo) -> Value {
+    fn status(self, addr: SocketAddr, device: Device, sysinfo: &SysInfo) -> Value {
         match self {
             Format::Short => json!([
                 ["Address", addr],

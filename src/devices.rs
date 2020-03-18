@@ -160,7 +160,7 @@ pub enum Device {
 
 impl Device {
     pub fn from_data(addr: SocketAddr, device_data: &DeviceData) -> Device {
-        let model = device_data.clone().sysinfo().model;
+        let model = &device_data.sysinfo().model;
         if model.contains("HS100") {
             Device::HS100(HS100::from_addr(addr))
         } else if model.contains("HS110") {
