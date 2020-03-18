@@ -34,7 +34,7 @@ use crate::{
 /// A raw, generic smart device
 pub struct RawDevice {
     addr: SocketAddr,
-    protocol: Box<dyn Protocol>,
+    protocol: Box<dyn Protocol + Send>,
 }
 
 impl RawDevice {
