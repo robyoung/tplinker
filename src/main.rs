@@ -469,14 +469,13 @@ fn main() {
             .or_else(|_| -> Result<_, ()> {
                 Ok(SocketAddr::new(addr.parse().map_err(|_| ())?, 9999))
             })
-            .expect(&format!("not a valid address: {}", addr))
+            .unwrap_or_else(|_| panic!("not a valid address: {}", addr))
     }
 
     fn parse_addresses(matches: &clap::ArgMatches) -> Vec<SocketAddr> {
         matches
             .values_of("address")
             .unwrap()
-            .into_iter()
             .map(parse_address)
             .collect()
     }

@@ -49,7 +49,7 @@ impl GetLightStateResult {
     pub fn light_state(self) -> Result<LightState> {
         match self.lightingservice {
             SectionResult::Ok(light_state) => Ok(light_state.light_state),
-            SectionResult::Err(err) => Err(Error::from(err.clone())),
+            SectionResult::Err(err) => Err(Error::from(err)),
         }
     }
 }
