@@ -98,13 +98,15 @@ pub trait Switch: DeviceActions {
 
     /// Switch the device on
     fn switch_on(&self) -> Result<()> {
-        self.send(&r#"{"system":{"set_relay_state":{"state": 1}}}"#)?;
+        // TODO: deserialize into a type that can be verified
+        self.send::<serde_json::Value>(&r#"{"system":{"set_relay_state":{"state": 1}}}"#)?;
         Ok(())
     }
 
     /// Switch the device off
     fn switch_off(&self) -> Result<()> {
-        self.send(&r#"{"system":{"set_relay_state":{"state": 0}}}"#)?;
+        // TODO: deserialize into a type that can be verified
+        self.send::<serde_json::Value>(&r#"{"system":{"set_relay_state":{"state": 0}}}"#)?;
         Ok(())
     }
 
