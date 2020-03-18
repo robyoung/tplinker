@@ -1,21 +1,19 @@
 //! Discover devices on the local network
 //!
-//! ```
+//! ```no_run
 //! use tplinker::{
 //!   discovery::discover,
 //!   devices::Device,
 //!   capabilities::Switch,
 //! };
 //!
-//! fn main() {
-//!   for (addr, data) in discover().unwrap() {
-//!     let device = Device::from_data(addr, &data);
-//!     let sysinfo = data.sysinfo();
-//!     println!("{}\t{}\t{}", addr, sysinfo.alias, sysinfo.hw_type);
-//!     match device {
-//!       Device::HS110(device) => { device.switch_on().unwrap(); },
-//!       _ => {},
-//!     }
+//! for (addr, data) in discover().unwrap() {
+//!   let device = Device::from_data(addr, &data);
+//!   let sysinfo = data.sysinfo();
+//!   println!("{}\t{}\t{}", addr, sysinfo.alias, sysinfo.hw_type);
+//!   match device {
+//!     Device::HS110(device) => { device.switch_on().unwrap(); },
+//!     _ => {},
 //!   }
 //! }
 //! ```
