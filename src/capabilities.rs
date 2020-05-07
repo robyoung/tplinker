@@ -44,8 +44,7 @@ pub trait DeviceActions {
             "system": {"set_dev_alias": {"alias": alias}}
         })
         .to_string();
-        self.send(&command)?;
-        Ok(())
+        check_command_error(self.send(&command)?, "/system/set_dev_alias/err_code")
     }
 
     /// Get the latitude and longitude coordinates
@@ -73,8 +72,8 @@ pub trait DeviceActions {
             "system": {"reboot": {"delay": delay.as_secs()}}
         })
         .to_string();
-        self.send(&command)?;
-        Ok(())
+
+        check_command_error(self.send(&command)?, "/system/reboot/err_code")
     }
 }
 
@@ -98,16 +97,12 @@ pub trait Switch: DeviceActions {
 
     /// Switch the device on
     fn switch_on(&self) -> Result<()> {
-        // TODO: deserialize into a type that can be verified
-        self.send::<serde_json::Value>(&r#"{"system":{"set_relay_state":{"state": 1}}}"#)?;
-        Ok(())
+        check_command_error(self.send(&r#"{"system":{"set_relay_state":{"state": 1}}}"#)?, "/system/set_relay_state/err_code")
     }
 
     /// Switch the device off
     fn switch_off(&self) -> Result<()> {
-        // TODO: deserialize into a type that can be verified
-        self.send::<serde_json::Value>(&r#"{"system":{"set_relay_state":{"state": 0}}}"#)?;
-        Ok(())
+        check_command_error(self.send(&r#"{"system":{"set_relay_state":{"state": 0}}}"#)?, "/system/set_relay_state/err_code")
     }
 
     /// Toggle the device's on state
@@ -265,4 +260,183 @@ pub trait Emeter: DeviceActions {
         .to_string();
         Ok(self.send(&command)?)
     }
+}
+
+/// Check the error code of a standard command
+fn check_command_error(value: serde_json::Value, pointer: &str) -> Result<()> {
+    if let Some(err_code) = value.pointer(pointer) {
+        if err_code == 0 {
+            Ok(())
+        } else {
+            Err(Error::Other(format!("Invalid error code {}", err_code)))
+        }
+    } else {
+        Err(Error::Other(format!("Invalid response format: {}", value)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::datatypes::tests::HS100_JSON;
+    use std::cell::Cell;
+
+    struct DummyDevice {
+        msgs: Cell<Vec<String>>,
+        resps: Cell<Vec<Result<String>>>,
+    }
+
+    impl DummyDevice {
+        fn new(resp: Result<String>) -> Self {
+            Self::multi(vec![resp])
+        }
+
+        fn multi(resps: Vec<Result<String>>) -> Self {
+            Self {
+                msgs: Cell::new(Vec::new()),
+                resps: Cell::new(resps),
+            }
+        }
+
+        fn reset(&self, resp: Result<String>) {
+            self.msgs.set(Vec::new());
+            self.resps.set(vec![resp]);
+        }
+
+        fn push_msg(&self, msg: &str) {
+            let mut msgs = self.msgs.replace(vec![]);
+            msgs.push(msg.to_string());
+            self.msgs.set(msgs);
+        }
+
+        fn pop_resp(&self) -> Result<String> {
+            let mut resps = self.resps.replace(vec![]);
+            let resp = resps.remove(0);
+            self.resps.set(resps);
+            resp
+        }
+    }
+
+    impl DeviceActions for DummyDevice {
+        fn send<D: DeserializeOwned>(&self, msg: &str) -> Result<D> {
+            self.push_msg(msg);
+            match self.pop_resp() {
+                Ok(resp) => Ok(serde_json::from_str::<D>(&resp)?),
+                Err(err) => Err(err),
+            }
+        }
+    }
+
+    impl Switch for DummyDevice {}
+
+    #[test]
+    fn device_sysinfo() {
+        let device = DummyDevice::new(Ok(HS100_JSON.to_string()));
+
+        device.sysinfo().unwrap();
+    }
+
+    #[test]
+    fn device_alias() {
+        let device = DummyDevice::new(Ok(HS100_JSON.to_string()));
+
+        assert_eq!(device.alias().unwrap(), "Switch Two".to_string());
+    }
+
+    #[test]
+    fn device_set_alias() {
+        let device = DummyDevice::new(Ok(
+            r#"{"system":{"set_dev_alias":{"err_code":0}}}"#.to_string()
+        ));
+
+        device.set_alias("dave").unwrap();
+
+        let inner = device.msgs.into_inner();
+
+        assert_eq!(inner[0], r#"{"system":{"set_dev_alias":{"alias":"dave"}}}"#);
+    }
+
+    #[test]
+    fn device_location() {
+        let device = DummyDevice::new(Ok(HS100_JSON.to_string()));
+
+        assert_eq!(device.location().unwrap(), (3456.0, 123.0));
+    }
+
+    #[test]
+    fn device_reboot_with_delay() {
+        let device = DummyDevice::new(Ok(r#"{"system":{"reboot":{"err_code":0}}}"#.to_string()));
+
+        device.reboot_with_delay(Duration::from_secs(120)).unwrap();
+
+        assert_eq!(
+            device.msgs.into_inner()[0],
+            r#"{"system":{"reboot":{"delay":120}}}"#
+        );
+    }
+
+    #[test]
+    fn device_reboot() {
+        let device = DummyDevice::new(Ok(r#"{"system":{"reboot":{"err_code":0}}}"#.to_string()));
+
+        device.reboot().unwrap();
+
+        assert_eq!(
+            device.msgs.into_inner()[0],
+            r#"{"system":{"reboot":{"delay":1}}}"#
+        );
+    }
+
+    #[test]
+    fn switch_is_on_off() {
+        let device = DummyDevice::new(Ok(HS100_JSON.to_string()));
+
+        assert_eq!(device.is_on().unwrap(), false);
+
+        device.reset(Ok(HS100_JSON.to_string()));
+        assert_eq!(device.is_off().unwrap(), true);
+    }
+
+    #[test]
+    fn switch_on() {
+        let device = DummyDevice::new(Ok(
+            r#"{"system":{"set_relay_state":{"err_code":0}}}"#.to_string()
+        ));
+
+        device.switch_on().unwrap();
+
+        assert_eq!(
+            device.msgs.into_inner()[0],
+            r#"{"system":{"set_relay_state":{"state": 1}}}"#
+        );
+    }
+
+    #[test]
+    fn switch_off() {
+        let device = DummyDevice::new(Ok(
+            r#"{"system":{"set_relay_state":{"err_code":0}}}"#.to_string()
+        ));
+
+        device.switch_off().unwrap();
+
+        assert_eq!(
+            device.msgs.into_inner()[0],
+            r#"{"system":{"set_relay_state":{"state": 0}}}"#
+        );
+    }
+
+    #[test]
+    fn switch_toggle() {
+        let device = DummyDevice::multi(vec![
+            Ok(HS100_JSON.to_string()),
+            Ok(r#"{"system":{"set_relay_state":{"err_code":0}}}"#.to_string()),
+        ]);
+
+        assert_eq!(device.toggle().unwrap(), true);
+        assert_eq!(device.msgs.into_inner(), vec![
+            r#"{"system":{"get_sysinfo":null}}"#,
+            r#"{"system":{"set_relay_state":{"state": 1}}}"#,
+        ]);
+    }
+
 }
