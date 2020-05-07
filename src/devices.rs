@@ -32,17 +32,17 @@ use crate::{
 // DEVICES
 
 /// A raw, generic smart device
-pub struct RawDevice {
+pub struct RawDevice<T: Protocol> {
     addr: SocketAddr,
-    protocol: Box<dyn Protocol + Send>,
+    protocol: T,
 }
 
-impl RawDevice {
+impl RawDevice<DefaultProtocol> {
     /// Make a raw device from an address string
-    pub fn new(addr: &str) -> result::Result<RawDevice, AddrParseError> {
+    pub fn new(addr: &str) -> result::Result<RawDevice<DefaultProtocol>, AddrParseError> {
         Ok(Self {
             addr: SocketAddr::from_str(addr)?,
-            protocol: Box::new(DefaultProtocol::new()),
+            protocol: DefaultProtocol::new(),
         })
     }
 
@@ -50,14 +50,14 @@ impl RawDevice {
     pub fn from_addr(addr: SocketAddr) -> Self {
         Self {
             addr,
-            protocol: Box::new(DefaultProtocol::new()),
+            protocol: DefaultProtocol::new(),
         }
     }
 }
 
-impl DeviceActions for RawDevice {
-    fn send<'a, T: DeserializeOwned>(&self, msg: &str) -> Result<T> {
-        Ok(serde_json::from_str::<T>(
+impl<T: Protocol> DeviceActions for RawDevice<T> {
+    fn send<'a, D: DeserializeOwned>(&self, msg: &str) -> Result<D> {
+        Ok(serde_json::from_str::<D>(
             &self.protocol.send(self.addr, msg)?,
         )?)
     }
@@ -79,21 +79,16 @@ macro_rules! new_device {
       => raw # $docraw:expr
       => addr # $docaddr:expr ) => {
         #[doc = $docmain]
-        pub struct $x {
-            raw: RawDevice,
+        pub struct $x<T: Protocol> {
+            raw: RawDevice<T>,
         }
 
-        impl $x {
+        impl $x<DefaultProtocol> {
             #[doc = $docnew]
             pub fn new(addr: &str) -> std::result::Result<Self, AddrParseError> {
                 Ok(Self {
                     raw: RawDevice::new(addr)?,
                 })
-            }
-
-            #[doc = $docraw]
-            pub fn from_raw(raw: RawDevice) -> Self {
-                Self { raw }
             }
 
             #[doc = $docaddr]
@@ -104,8 +99,15 @@ macro_rules! new_device {
             }
         }
 
-        impl DeviceActions for $x {
-            fn send<T: DeserializeOwned>(&self, msg: &str) -> Result<T> {
+        impl<T: Protocol> $x<T> {
+            #[doc = $docraw]
+            pub fn from_raw(raw: RawDevice<T>) -> Self {
+                Self { raw }
+            }
+        }
+
+        impl<T: Protocol> DeviceActions for $x<T> {
+            fn send<D: DeserializeOwned>(&self, msg: &str) -> Result<D> {
                 self.raw.send(msg)
             }
         }
@@ -114,16 +116,16 @@ macro_rules! new_device {
 
 new_device!(HS100, "smart plug");
 
-impl Switch for HS100 {}
+impl<T: Protocol> Switch for HS100<T> {}
 
 new_device!(HS110, "smart plug with energy monitoring");
 
-impl Switch for HS110 {}
-impl Emeter for HS110 {}
+impl<T: Protocol> Switch for HS110<T> {}
+impl<T: Protocol> Emeter for HS110<T> {}
 
 new_device!(LB110, "dimmable smart lightbulb");
 
-impl Switch for LB110 {
+impl<T: Protocol> Switch for LB110<T> {
     fn is_on(&self) -> Result<bool> {
         Ok(self.get_light_state()?.on_off == 1)
     }
@@ -138,9 +140,9 @@ impl Switch for LB110 {
         Ok(())
     }
 }
-impl Light for LB110 {}
-impl Dimmer for LB110 {}
-impl Emeter for LB110 {
+impl<T: Protocol> Light for LB110<T> {}
+impl<T: Protocol> Dimmer for LB110<T> {}
+impl<T: Protocol> Emeter for LB110<T> {
     fn emeter_type(&self) -> String {
         String::from("smartlife.iot.common.emeter")
     }
@@ -152,10 +154,10 @@ impl Emeter for LB110 {
 /// If the device type is not recognised but we can parse the response the
 /// `Unknown` variant is returned.
 pub enum Device {
-    HS100(HS100),
-    HS110(HS110),
-    LB110(LB110),
-    Unknown(RawDevice),
+    HS100(HS100<DefaultProtocol>),
+    HS110(HS110<DefaultProtocol>),
+    LB110(LB110<DefaultProtocol>),
+    Unknown(RawDevice<DefaultProtocol>),
 }
 
 impl Device {
@@ -174,7 +176,7 @@ impl Device {
 }
 
 impl DeviceActions for Device {
-    fn send<T: DeserializeOwned>(&self, msg: &str) -> Result<T> {
+    fn send<D: DeserializeOwned>(&self, msg: &str) -> Result<D> {
         match self {
             Device::HS100(d) => d.send(msg),
             Device::HS110(d) => d.send(msg),
@@ -188,7 +190,7 @@ impl DeviceActions for Device {
 mod tests {
     use super::*;
     use crate::datatypes::tests::HS100_JSON;
-    use crate::protocol::ProtocolMock;
+    use crate::protocol::mock::ProtocolMock;
 
     #[test]
     fn test_raw_device_submit_success() {
@@ -197,7 +199,7 @@ mod tests {
         protocol.set_send_return_value(Ok(String::from(HS100_JSON)));
         let device = RawDevice {
             addr: "0.0.0.0:9999".parse().unwrap(),
-            protocol: Box::new(protocol),
+            protocol: protocol,
         };
 
         // act
@@ -213,7 +215,7 @@ mod tests {
         protocol.set_send_return_value(Ok(String::from("invalid")));
         let device = RawDevice {
             addr: "0.0.0.0:9999".parse().unwrap(),
-            protocol: Box::new(protocol),
+            protocol: protocol,
         };
 
         assert!(device.send::<DeviceData>("{}").is_err());
@@ -225,7 +227,7 @@ mod tests {
         protocol.set_send_return_value(Ok(String::from(HS100_JSON)));
         let device = RawDevice {
             addr: "0.0.0.0:9999".parse().unwrap(),
-            protocol: Box::new(protocol),
+            protocol: protocol,
         };
 
         assert_eq!((3456.0, 123.0), device.location().unwrap());

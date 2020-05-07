@@ -52,7 +52,7 @@ pub fn decrypt(cipher: &mut [u8]) -> String {
     String::from_utf8_lossy(cipher).into_owned()
 }
 
-pub trait Protocol {
+pub trait Protocol: Send {
     fn send(&self, ip: SocketAddr, msg: &str) -> Result<String, Error>;
 }
 
@@ -93,42 +93,47 @@ impl Protocol for DefaultProtocol {
                 "response not big enough to decrypt",
             )))
         } else {
-            Ok(decrypt(&mut resp.split_off(4)))
+            let result = decrypt(&mut resp.split_off(4));
+            println!("RESULT: {}", result);
+            Ok(result)
         }
     }
 }
 
 #[cfg(test)]
-pub struct ProtocolMock {
-    req: Cell<Option<(String, String)>>,
-    resp: Cell<Result<String, Error>>,
-}
+pub(crate) mod mock {
+    use super::*;
 
-#[cfg(test)]
-impl ProtocolMock {
-    pub fn new() -> ProtocolMock {
-        ProtocolMock {
-            req: Cell::new(None),
-            resp: Cell::new(Ok(String::from(""))),
+    pub(crate) struct ProtocolMock {
+        req: Cell<Option<(String, String)>>,
+        resp: Cell<Result<String, Error>>,
+    }
+
+    impl ProtocolMock {
+        pub fn new() -> ProtocolMock {
+            ProtocolMock {
+                req: Cell::new(None),
+                resp: Cell::new(Ok(String::from(""))),
+            }
+        }
+
+        pub fn set_send_return_value(&self, resp: Result<String, Error>) {
+            self.resp.set(resp);
         }
     }
 
-    pub fn set_send_return_value(&self, resp: Result<String, Error>) {
-        self.resp.set(resp);
-    }
-}
-
-#[cfg(test)]
-impl Protocol for ProtocolMock {
-    fn send(&self, ip: SocketAddr, msg: &str) -> Result<String, Error> {
-        self.req.set(Some((ip.to_string(), msg.to_string())));
-        self.resp.replace(Ok(String::from("")))
+    impl Protocol for ProtocolMock {
+        fn send(&self, ip: SocketAddr, msg: &str) -> Result<String, Error> {
+            self.req.set(Some((ip.to_string(), msg.to_string())));
+            self.resp.replace(Ok(String::from("")))
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::{net::TcpListener, sync::mpsc::channel, thread};
 
     #[test]
     fn encrypt_decrypt() {
@@ -138,5 +143,47 @@ mod tests {
         let resp = decrypt(&mut data.unwrap().split_off(4));
 
         assert_eq!(json, resp);
+    }
+
+    #[test]
+    fn protocol_send() {
+        // arrange
+        let protocol = DefaultProtocol::new();
+        let msg = "{\"system\":{\"get_sysinfo\":{}}}";
+        let resp = "great response";
+
+        let (sender, ready) = channel();
+        thread::spawn(move || {
+            let listener: TcpListener;
+            // Bind to lowest available port
+            let mut port = 5818;
+            loop {
+                match TcpListener::bind(format!("127.0.0.1:{}", port)) {
+                    Ok(ok) => {
+                        listener = ok;
+                        break;
+                    }
+                    Err(_) => {
+                        port += 1;
+                    }
+                }
+            }
+
+            sender.send(port).unwrap();
+            match listener.accept() {
+                Ok((mut socket, _)) => {
+                    socket.write(&encrypt(resp).unwrap()).unwrap();
+                }
+                _ => {}
+            }
+        });
+        let port = ready.recv().unwrap();
+        let addr: SocketAddr = format!("127.0.0.1:{}", port).parse().unwrap();
+
+        // act
+        let result = protocol.send(addr, msg).unwrap();
+
+        // assert
+        assert_eq!(result, resp.to_string());
     }
 }
