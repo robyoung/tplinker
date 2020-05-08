@@ -56,13 +56,8 @@ pub trait Protocol: Send {
     fn send(&self, ip: SocketAddr, msg: &str) -> Result<String, Error>;
 }
 
+#[derive(Default)]
 pub struct DefaultProtocol;
-
-impl DefaultProtocol {
-    pub fn new() -> DefaultProtocol {
-        DefaultProtocol {}
-    }
-}
 
 impl Protocol for DefaultProtocol {
     fn send(&self, ip: SocketAddr, msg: &str) -> Result<String, Error> {
@@ -109,14 +104,16 @@ pub(crate) mod mock {
         resp: Cell<Result<String, Error>>,
     }
 
-    impl ProtocolMock {
-        pub fn new() -> ProtocolMock {
+    impl Default for ProtocolMock {
+        fn default() -> Self {
             ProtocolMock {
                 req: Cell::new(None),
                 resp: Cell::new(Ok(String::from(""))),
             }
         }
+    }
 
+    impl ProtocolMock {
         pub fn set_send_return_value(&self, resp: Result<String, Error>) {
             self.resp.set(resp);
         }
@@ -148,7 +145,7 @@ mod tests {
     #[test]
     fn protocol_send() {
         // arrange
-        let protocol = DefaultProtocol::new();
+        let protocol = DefaultProtocol::default();
         let msg = "{\"system\":{\"get_sysinfo\":{}}}";
         let resp = "great response";
 

@@ -1,5 +1,4 @@
 //! Error types
-use serde_json;
 use std::{convert::From, error, fmt, io, result};
 
 #[derive(Debug)]

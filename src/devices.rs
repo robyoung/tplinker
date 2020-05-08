@@ -42,7 +42,7 @@ impl RawDevice<DefaultProtocol> {
     pub fn new(addr: &str) -> result::Result<RawDevice<DefaultProtocol>, AddrParseError> {
         Ok(Self {
             addr: SocketAddr::from_str(addr)?,
-            protocol: DefaultProtocol::new(),
+            protocol: DefaultProtocol::default(),
         })
     }
 
@@ -50,7 +50,7 @@ impl RawDevice<DefaultProtocol> {
     pub fn from_addr(addr: SocketAddr) -> Self {
         Self {
             addr,
-            protocol: DefaultProtocol::new(),
+            protocol: DefaultProtocol::default(),
         }
     }
 }
@@ -189,17 +189,17 @@ impl DeviceActions for Device {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::datatypes::tests::HS100_JSON;
+    use crate::datatypes::tests::HS100_JSON_OFF;
     use crate::protocol::mock::ProtocolMock;
 
     #[test]
     fn test_raw_device_submit_success() {
         // arrange
-        let protocol = ProtocolMock::new();
-        protocol.set_send_return_value(Ok(String::from(HS100_JSON)));
+        let protocol = ProtocolMock::default();
+        protocol.set_send_return_value(Ok(String::from(HS100_JSON_OFF)));
         let device = RawDevice {
             addr: "0.0.0.0:9999".parse().unwrap(),
-            protocol: protocol,
+            protocol,
         };
 
         // act
@@ -211,11 +211,11 @@ mod tests {
 
     #[test]
     fn test_raw_device_submit_failure() {
-        let protocol = ProtocolMock::new();
+        let protocol = ProtocolMock::default();
         protocol.set_send_return_value(Ok(String::from("invalid")));
         let device = RawDevice {
             addr: "0.0.0.0:9999".parse().unwrap(),
-            protocol: protocol,
+            protocol,
         };
 
         assert!(device.send::<DeviceData>("{}").is_err());
@@ -223,11 +223,11 @@ mod tests {
 
     #[test]
     fn test_raw_device_location() {
-        let protocol = ProtocolMock::new();
-        protocol.set_send_return_value(Ok(String::from(HS100_JSON)));
+        let protocol = ProtocolMock::default();
+        protocol.set_send_return_value(Ok(String::from(HS100_JSON_OFF)));
         let device = RawDevice {
             addr: "0.0.0.0:9999".parse().unwrap(),
-            protocol: protocol,
+            protocol,
         };
 
         assert_eq!((3456.0, 123.0), device.location().unwrap());

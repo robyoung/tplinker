@@ -97,12 +97,18 @@ pub trait Switch: DeviceActions {
 
     /// Switch the device on
     fn switch_on(&self) -> Result<()> {
-        check_command_error(self.send(&r#"{"system":{"set_relay_state":{"state": 1}}}"#)?, "/system/set_relay_state/err_code")
+        check_command_error(
+            self.send(&r#"{"system":{"set_relay_state":{"state":1}}}"#)?,
+            "/system/set_relay_state/err_code",
+        )
     }
 
     /// Switch the device off
     fn switch_off(&self) -> Result<()> {
-        check_command_error(self.send(&r#"{"system":{"set_relay_state":{"state": 0}}}"#)?, "/system/set_relay_state/err_code")
+        check_command_error(
+            self.send(&r#"{"system":{"set_relay_state":{"state":0}}}"#)?,
+            "/system/set_relay_state/err_code",
+        )
     }
 
     /// Toggle the device's on state
@@ -244,6 +250,9 @@ pub trait Emeter: DeviceActions {
     /// Get the daily energy usage for a given month
     // TODO: add proper return type
     fn get_emeter_daily(&self, year: u16, month: u8) -> Result<serde_json::Value> {
+        if month > 12 {
+            return Err(Error::Other("Month must be less than 12".to_string()));
+        }
         let command = json!({
             self.emeter_type(): {"get_daystat": {"month": month, "year": year}}
         })
@@ -278,7 +287,7 @@ fn check_command_error(value: serde_json::Value, pointer: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::datatypes::tests::HS100_JSON;
+    use crate::datatypes::tests::{HS100_JSON_OFF, HS100_JSON_ON, LB110_JSON_ON};
     use std::cell::Cell;
 
     struct DummyDevice {
@@ -296,11 +305,6 @@ mod tests {
                 msgs: Cell::new(Vec::new()),
                 resps: Cell::new(resps),
             }
-        }
-
-        fn reset(&self, resp: Result<String>) {
-            self.msgs.set(Vec::new());
-            self.resps.set(vec![resp]);
         }
 
         fn push_msg(&self, msg: &str) {
@@ -328,17 +332,20 @@ mod tests {
     }
 
     impl Switch for DummyDevice {}
+    impl Light for DummyDevice {}
+    impl Dimmer for DummyDevice {}
+    impl Emeter for DummyDevice {}
 
     #[test]
     fn device_sysinfo() {
-        let device = DummyDevice::new(Ok(HS100_JSON.to_string()));
+        let device = DummyDevice::new(Ok(HS100_JSON_OFF.to_string()));
 
         device.sysinfo().unwrap();
     }
 
     #[test]
     fn device_alias() {
-        let device = DummyDevice::new(Ok(HS100_JSON.to_string()));
+        let device = DummyDevice::new(Ok(HS100_JSON_OFF.to_string()));
 
         assert_eq!(device.alias().unwrap(), "Switch Two".to_string());
     }
@@ -357,8 +364,19 @@ mod tests {
     }
 
     #[test]
+    fn device_set_alias_invalid_response() {
+        let device = DummyDevice::multi(vec![
+            Ok(r#"{"system":{"set_dev_alias":{"err_code":1}}}"#.to_string()),
+            Ok(r#"{"system":{"set_dev_alias":{"invalid":1}}}"#.to_string()),
+        ]);
+
+        assert!(device.set_alias("dave").is_err());
+        assert!(device.set_alias("dave").is_err());
+    }
+
+    #[test]
     fn device_location() {
-        let device = DummyDevice::new(Ok(HS100_JSON.to_string()));
+        let device = DummyDevice::new(Ok(HS100_JSON_OFF.to_string()));
 
         assert_eq!(device.location().unwrap(), (3456.0, 123.0));
     }
@@ -389,11 +407,12 @@ mod tests {
 
     #[test]
     fn switch_is_on_off() {
-        let device = DummyDevice::new(Ok(HS100_JSON.to_string()));
+        let device = DummyDevice::multi(vec![
+            Ok(HS100_JSON_OFF.to_string()),
+            Ok(HS100_JSON_OFF.to_string()),
+        ]);
 
         assert_eq!(device.is_on().unwrap(), false);
-
-        device.reset(Ok(HS100_JSON.to_string()));
         assert_eq!(device.is_off().unwrap(), true);
     }
 
@@ -407,7 +426,7 @@ mod tests {
 
         assert_eq!(
             device.msgs.into_inner()[0],
-            r#"{"system":{"set_relay_state":{"state": 1}}}"#
+            r#"{"system":{"set_relay_state":{"state":1}}}"#
         );
     }
 
@@ -421,22 +440,135 @@ mod tests {
 
         assert_eq!(
             device.msgs.into_inner()[0],
-            r#"{"system":{"set_relay_state":{"state": 0}}}"#
+            r#"{"system":{"set_relay_state":{"state":0}}}"#
         );
     }
 
     #[test]
-    fn switch_toggle() {
+    fn switch_toggle_on() {
         let device = DummyDevice::multi(vec![
-            Ok(HS100_JSON.to_string()),
+            Ok(HS100_JSON_OFF.to_string()),
             Ok(r#"{"system":{"set_relay_state":{"err_code":0}}}"#.to_string()),
         ]);
 
         assert_eq!(device.toggle().unwrap(), true);
+        assert_eq!(
+            device.msgs.into_inner(),
+            vec![
+                r#"{"system":{"get_sysinfo":null}}"#,
+                r#"{"system":{"set_relay_state":{"state":1}}}"#,
+            ]
+        );
+    }
+
+    #[test]
+    fn switch_toggle_off() {
+        let device = DummyDevice::multi(vec![
+            Ok(HS100_JSON_ON.to_string()),
+            Ok(r#"{"system":{"set_relay_state":{"err_code":0}}}"#.to_string()),
+        ]);
+
+        assert_eq!(device.toggle().unwrap(), false);
+        assert_eq!(
+            device.msgs.into_inner(),
+            vec![
+                r#"{"system":{"get_sysinfo":null}}"#,
+                r#"{"system":{"set_relay_state":{"state":0}}}"#,
+            ]
+        );
+    }
+
+    #[test]
+    fn get_light_state() {
+        let device = DummyDevice::new(Ok(LB110_JSON_ON.to_string()));
+
+        assert_eq!(device.get_light_state().unwrap().on_off, 1);
+        assert_eq!(
+            device.msgs.into_inner(),
+            vec![
+                r#"{"smartlife.iot.smartbulb.lightingservice":{"get_light_state":null}}"#
+                    .to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn set_light_state() {
+        let device = DummyDevice::new(Ok(LB110_JSON_ON.to_string()));
+        let mut set_light_state = SetLightState::default();
+        set_light_state.on_off = Some(1);
+
+        assert_eq!(device.set_light_state(set_light_state).unwrap().on_off, 1);
         assert_eq!(device.msgs.into_inner(), vec![
-            r#"{"system":{"get_sysinfo":null}}"#,
-            r#"{"system":{"set_relay_state":{"state": 1}}}"#,
+            r#"{"smartlife.iot.smartbulb.lightingservice":{"transition_light_state":{"on_off":1}}}"#.to_string(),
         ]);
     }
 
+    #[test]
+    fn brightness() {
+        let device = DummyDevice::new(Ok(LB110_JSON_ON.to_string()));
+
+        assert_eq!(device.brightness().unwrap(), 10);
+        assert_eq!(
+            device.msgs.into_inner(),
+            vec![
+                r#"{"smartlife.iot.smartbulb.lightingservice":{"get_light_state":null}}"#
+                    .to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn set_brightness() {
+        let device = DummyDevice::new(Ok(LB110_JSON_ON.to_string()));
+
+        assert!(device.set_brightness(101).is_err());
+        device.set_brightness(56).unwrap();
+        assert_eq!(device.msgs.into_inner(), vec![
+            r#"{"smartlife.iot.smartbulb.lightingservice":{"transition_light_state":{"brightness":56}}}"#.to_string(),
+        ]);
+    }
+
+    #[test]
+    fn get_emeter_realtime() {
+        let device = DummyDevice::new(Ok("{}".to_string()));
+
+        device.get_emeter_realtime().unwrap();
+
+        assert_eq!(
+            device.msgs.into_inner(),
+            vec![r#"{"emeter":{"get_realtime":null}}"#,]
+        );
+    }
+
+    #[test]
+    fn get_emeter_daily() {
+        let device = DummyDevice::new(Ok("{}".to_string()));
+
+        device.get_emeter_daily(2020, 10).unwrap();
+
+        assert_eq!(
+            device.msgs.into_inner(),
+            vec![r#"{"emeter":{"get_daystat":{"month":10,"year":2020}}}"#,]
+        );
+    }
+
+    #[test]
+    fn get_emeter_daily_invalid_month() {
+        let device = DummyDevice::new(Ok("{}".to_string()));
+
+        assert!(device.get_emeter_daily(2020, 20).is_err());
+    }
+
+    #[test]
+    fn get_emeter_monthly() {
+        let device = DummyDevice::new(Ok("{}".to_string()));
+
+        device.get_emeter_monthly(2020).unwrap();
+
+        assert_eq!(
+            device.msgs.into_inner(),
+            vec![r#"{"emeter":{"get_monthstat":{"year":2020}}}"#,]
+        );
+    }
 }

@@ -220,7 +220,7 @@ pub struct DftOnState {
     pub brightness: u16,
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Clone, Default)]
 pub struct SetLightState {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub on_off: Option<u8>,
@@ -254,7 +254,7 @@ pub struct EmeterRealtime {
 pub mod tests {
     use super::*;
 
-    pub const HS100_JSON: &'static str = r#"{
+    pub const HS100_JSON_OFF: &'static str = r#"{
       "system": {
         "get_sysinfo": {
           "sw_ver": "1.5.8 Build 180815 Rel.135935",
@@ -265,6 +265,57 @@ pub mod tests {
           "dev_name": "Smart Wi-Fi Plug",
           "alias": "Switch Two",
           "relay_state": 0,
+          "on_time": 0,
+          "active_mode": "none",
+          "feature": "TIM",
+          "updating": 0,
+          "icon_hash": "",
+          "rssi": -53,
+          "led_off": 0,
+          "longitude_i": 123,
+          "latitude_i": 3456,
+          "hwId": "00000000000000000000000000000000",
+          "fwId": "00000000000000000000000000000000",
+          "deviceId": "0000000000000000000000000000000000000000",
+          "oemId": "FDD18403D5E8DB3613009C820963E018",
+          "next_action": {
+            "type": -1
+          },
+          "ntc_state": 0,
+          "err_code": 0
+        }
+      },
+      "emeter": {
+        "get_realtime": {
+          "err_code": -1,
+          "err_msg": "module not support"
+        }
+      },
+      "smartlife.iot.dimmer": {
+        "err_code": -1,
+        "err_msg": "module not support"
+      },
+      "smartlife.iot.common.emeter": {
+        "err_code": -1,
+        "err_msg": "module not support"
+      },
+      "smartlife.iot.smartbulb.lightingservice": {
+        "err_code": -1,
+        "err_msg": "module not support"
+      }
+    }"#;
+
+    pub const HS100_JSON_ON: &'static str = r#"{
+      "system": {
+        "get_sysinfo": {
+          "sw_ver": "1.5.8 Build 180815 Rel.135935",
+          "hw_ver": "2.1",
+          "type": "IOT.SMARTPLUGSWITCH",
+          "model": "HS100(UK)",
+          "mac": "00:00:00:00:00:00",
+          "dev_name": "Smart Wi-Fi Plug",
+          "alias": "Switch Two",
+          "relay_state": 2,
           "on_time": 0,
           "active_mode": "none",
           "feature": "TIM",
@@ -355,7 +406,7 @@ pub mod tests {
       }
     }"#;
 
-    const LB110_JSON_OFF: &'static str = r#"{
+    pub const LB110_JSON_OFF: &'static str = r#"{
       "system": {
         "get_sysinfo": {
           "sw_ver": "1.8.6 Build 180809 Rel.091659",
@@ -453,7 +504,7 @@ pub mod tests {
       }
     }"#;
 
-    const LB110_JSON_ON: &'static str = r#"{
+    pub const LB110_JSON_ON: &'static str = r#"{
       "system": {
         "get_sysinfo": {
           "sw_ver": "1.8.6 Build 180809 Rel.091659",
@@ -549,7 +600,7 @@ pub mod tests {
 
     #[test]
     fn deserialise_hs100() {
-        let result = serde_json::from_str::<DeviceData>(&HS100_JSON).unwrap();
+        let result = serde_json::from_str::<DeviceData>(&HS100_JSON_OFF).unwrap();
 
         let sysinfo = result.sysinfo();
         assert_eq!(sysinfo.hw_ver, "2.1");
