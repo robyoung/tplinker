@@ -1,11 +1,16 @@
 //! Error types
 use std::{convert::From, error, fmt, io, result};
 
+/// Error type for TPLinker
 #[derive(Debug)]
 pub enum Error {
+    /// Wrapped errors from std::io
     IO(io::Error),
+    /// Wrapped errors from serde_json
     Serde(serde_json::Error),
+    /// Error decoding a section of the JSON response
     TPLink(SectionError),
+    /// A generic error
     Other(String),
 }
 
@@ -58,11 +63,16 @@ impl From<SectionError> for Error {
     }
 }
 
+/// TPLinker result type with [Error](enum.Error.html)
 pub type Result<T> = result::Result<T, Error>;
 
+/// Error response for a section of the JSON response
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct SectionError {
+    /// The error code. Zero if no error.
     pub err_code: i16,
+
+    /// The error message.
     pub err_msg: String,
 }
 

@@ -154,13 +154,19 @@ impl<T: Protocol> Emeter for LB110<T> {
 /// If the device type is not recognised but we can parse the response the
 /// `Unknown` variant is returned.
 pub enum Device {
+    /// Device variant for an HS100 smart plug
     HS100(HS100<DefaultProtocol>),
+    /// Device variant for an HS110 smart plug
     HS110(HS110<DefaultProtocol>),
+    /// Device variant for an LB110 smart light
     LB110(LB110<DefaultProtocol>),
+    /// Device variant for an unknown device
     Unknown(RawDevice<DefaultProtocol>),
 }
 
 impl Device {
+    /// Create a device from a raw `DeviceData`. Usually used from
+    /// [`discover`](../discovery/fn.discover.html).
     pub fn from_data(addr: SocketAddr, device_data: &DeviceData) -> Device {
         let model = &device_data.sysinfo().model;
         if model.contains("HS100") {

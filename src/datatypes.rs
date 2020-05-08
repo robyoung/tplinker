@@ -1,4 +1,7 @@
 //! Data types being sent to and from the devices
+
+#![allow(missing_docs)]
+
 use crate::error::{Error, Result, SectionError};
 
 type ErrCode = i16;

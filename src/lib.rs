@@ -60,6 +60,9 @@
 //!
 //! In order to do things with devices you must bring in the relevant capability
 //! traits from [`capabilities`](./capabilities/index.html).
+
+#![deny(missing_docs)]
+
 extern crate byteorder;
 
 #[macro_use]
