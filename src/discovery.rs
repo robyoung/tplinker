@@ -46,7 +46,7 @@ pub fn with_timeout(timeout: Option<Duration>) -> Result<Vec<(SocketAddr, Device
         socket.send_to(&req[4..req.len()], "255.255.255.255:9999")?;
     }
 
-    let mut buf = [0u8; 4096];
+    let mut buf = [0_u8; 4096];
 
     let mut devices = HashMap::new();
     while let Ok((size, addr)) = socket.recv_from(&mut buf) {

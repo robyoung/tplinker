@@ -61,7 +61,8 @@
 //! In order to do things with devices you must bring in the relevant capability
 //! traits from [`capabilities`](./capabilities/index.html).
 
-#![deny(missing_docs)]
+#![deny(missing_docs, clippy::pedantic)]
+#![allow(clippy::module_name_repetitions)]
 
 extern crate byteorder;
 
