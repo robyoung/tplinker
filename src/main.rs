@@ -6,7 +6,7 @@ use serde_json::{json, to_string as stringify, Value};
 use tplinker::{
     capabilities::{DeviceActions, Switch},
     datatypes::{DeviceData, SysInfo},
-    devices::{Device, RawDevice, HS100, HS110, LB110},
+    devices::{Device, RawDevice, HS100, HS105, HS110, LB110},
     error::Result as TpResult,
 };
 
@@ -97,6 +97,7 @@ fn command_switch_toggle(addr: SocketAddr, state: &str, format: Format) -> Vec<V
             } else {
                 match &dev {
                     Device::HS100(s) => toggle_switch(s, state),
+                    Device::HS105(s) => toggle_switch(s, state),
                     Device::HS110(s) => toggle_switch(s, state),
                     Device::LB110(s) => toggle_switch(s, state),
                     _ => panic!("not a switchable device: {}", addr),
@@ -131,6 +132,10 @@ fn device_from_addr(addr: SocketAddr) -> TpResult<(SocketAddr, Device, SysInfo)>
         let dev = HS100::from_raw(raw);
         let info = dev.sysinfo()?;
         (Device::HS100(dev), info)
+    } else if info.model.starts_with("HS105") {
+        let dev = HS105::from_raw(raw);
+        let info = dev.sysinfo()?;
+        (Device::HS105(dev), info)
     } else if info.model.starts_with("HS110") {
         let dev = HS110::from_raw(raw);
         let info = dev.sysinfo()?;
@@ -154,6 +159,7 @@ fn pad(value: &str, padding: usize) -> String {
 fn device_is_on(device: &Device) -> Option<bool> {
     match device {
         Device::HS100(device) => device.is_on().ok(),
+        Device::HS105(device) => device.is_on().ok(),
         Device::HS110(device) => device.is_on().ok(),
         Device::LB110(device) => device.is_on().ok(),
         _ => None,
@@ -376,6 +382,7 @@ impl Format {
     fn device(device: Device) -> &'static str {
         match device {
             Device::HS100(_) => "HS100",
+            Device::HS105(_) => "HS105",
             Device::HS110(_) => "HS110",
             Device::LB110(_) => "LB110",
             Device::Unknown(_) => "unknown",
