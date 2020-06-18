@@ -6,7 +6,7 @@ use serde_json::{json, to_string as stringify, Value};
 use tplinker::{
     capabilities::{DeviceActions, Switch},
     datatypes::{DeviceData, SysInfo},
-    devices::{Device, RawDevice, HS100, HS105, HS110, LB110},
+    devices::{Device, RawDevice, HS100, HS105, HS110, HS300, LB110},
     error::Result as TpResult,
 };
 
@@ -384,6 +384,7 @@ impl Format {
             Device::HS100(_) => "HS100",
             Device::HS105(_) => "HS105",
             Device::HS110(_) => "HS110",
+            Device::HS300(_) => "HS300",
             Device::LB110(_) => "LB110",
             Device::Unknown(_) => "unknown",
         }

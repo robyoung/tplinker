@@ -141,10 +141,10 @@ pub struct SysInfo {
     pub oem_id: String,
     pub alias: String,
     #[serde(alias = "description")]
-    pub dev_name: String,
+    pub dev_name: Option<String>,
     pub err_code: ErrCode,
     pub rssi: i32,
-    pub active_mode: String, // TODO: Could be enum
+    pub active_mode: Option<String>, // TODO: Could be enum
 
     // TODO: group fields together
     // HS..
@@ -166,12 +166,24 @@ pub struct SysInfo {
     pub longitude: Option<f64>,
     pub latitude: Option<f64>,
 
+    // HS300
+    pub children: Option<Vec<SysInfoChild>>,
+    pub child_num: Option<u8>,
+
     // LB110
     pub light_state: Option<LightState>,
     pub is_dimmable: Option<u8>,
     pub is_color: Option<u8>,
     pub is_variable_color_temp: Option<u8>,
     pub heapsize: Option<u64>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct SysInfoChild {
+    pub id: String,
+    pub state: u8,
+    pub alias: String,
+    pub on_time: u64,
 }
 
 impl SysInfo {
@@ -246,9 +258,13 @@ pub struct Emeter {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct EmeterRealtime {
+    #[serde(alias = "current_ma")]
     pub current: f64,
+    #[serde(alias = "voltage_mv")]
     pub voltage: f64,
+    #[serde(alias = "power_mw")]
     pub power: f64,
+    #[serde(alias = "total_wh")]
     pub total: f64,
     pub err_code: ErrCode,
 }
@@ -359,7 +375,7 @@ pub mod tests {
       }
     }"#;
 
-    const HS110_JSON: &'static str = r#"{
+    pub const HS110_JSON: &'static str = r#"{
       "system": {
         "get_sysinfo": {
           "err_code": 0,
@@ -392,6 +408,108 @@ pub mod tests {
           "voltage": 300.00,
           "power": 1.0,
           "total": 1.0,
+          "err_code": 0
+        }
+      },
+      "smartlife.iot.dimmer": {
+        "err_code": -1,
+        "err_msg": "module not support"
+      },
+      "smartlife.iot.common.emeter": {
+        "err_code": -1,
+        "err_msg": "module not support"
+      },
+      "smartlife.iot.smartbulb.lightingservice": {
+        "err_code": -1,
+        "err_msg": "module not support"
+      }
+    }"#;
+
+    pub const HS300_JSON: &'static str = r#"{
+      "system": {
+        "get_sysinfo": {
+          "sw_ver": "1.0.19 Build 200224 Rel.090814",
+          "hw_ver": "1.0",
+          "model": "HS300(US)",
+          "deviceId": "8006D152992421723AD993266C6EC3341B7DF5C6",
+          "oemId": "5C9E6254BEBAED63B2B6102966D24C17",
+          "hwId": "34C41AA028022D0CCEA5E678E8547C54",
+          "rssi": -61,
+          "longitude_i": -843913,
+          "latitude_i": 337738,
+          "alias": "Power Strip",
+          "status": "new",
+          "mic_type": "IOT.SMARTPLUGSWITCH",
+          "feature": "TIM:ENE",
+          "mac": "68:FF:7B:B8:8C:F6",
+          "updating": 0,
+          "led_off": 0,
+          "children": [
+            {
+              "id": "01",
+              "state": 1,
+              "alias": "Plug 1",
+              "on_time": 47724,
+              "next_action": {
+                "type": -1
+              }
+            },
+            {
+              "id": "00",
+              "state": 1,
+              "alias": "Plug 0",
+              "on_time": 2357786,
+              "next_action": {
+                "type": -1
+              }
+            },
+            {
+              "id": "02",
+              "state": 1,
+              "alias": "Plug 2",
+              "on_time": 47724,
+              "next_action": {
+                "type": -1
+              }
+            },
+            {
+              "id": "03",
+              "state": 1,
+              "alias": "Plug 3",
+              "on_time": 47724,
+              "next_action": {
+                "type": -1
+              }
+            },
+            {
+              "id": "04",
+              "state": 1,
+              "alias": "Plug 4",
+              "on_time": 45967,
+              "next_action": {
+                "type": -1
+              }
+            },
+            {
+              "id": "05",
+              "state": 1,
+              "alias": "Plug 5",
+              "on_time": 3906,
+              "next_action": {
+                "type": -1
+              }
+            }
+          ],
+          "child_num": 6,
+          "err_code": 0
+        }
+      },
+      "emeter": {
+        "get_realtime": {
+          "voltage_mv": 117379,
+          "current_ma": 1810,
+          "power_mw": 204526,
+          "total_wh": 231203,
           "err_code": 0
         }
       },
@@ -617,6 +735,17 @@ pub mod tests {
         let sysinfo = result.sysinfo();
         assert_eq!(sysinfo.hw_ver, "1.0");
         assert_eq!(sysinfo.model, "HS110(UK)");
+    }
+
+    #[test]
+    fn deserialise_hs300() {
+        let result = serde_json::from_str::<DeviceData>(&HS300_JSON).unwrap();
+
+        let sysinfo = result.sysinfo();
+        assert_eq!(sysinfo.hw_ver, "1.0");
+        assert_eq!(sysinfo.model, "HS300(US)");
+        assert_eq!(sysinfo.child_num, Some(6));
+        assert_eq!(sysinfo.children.as_ref().map(Vec::len), Some(6));
     }
 
     #[test]

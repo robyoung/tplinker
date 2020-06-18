@@ -127,6 +127,11 @@ new_device!(HS110, "smart plug with energy monitoring");
 impl<T: Protocol> Switch for HS110<T> {}
 impl<T: Protocol> Emeter for HS110<T> {}
 
+new_device!(HS300, "smart power strip with energy monitoring");
+
+impl<T: Protocol> Switch for HS300<T> {}
+impl<T: Protocol> Emeter for HS300<T> {}
+
 new_device!(LB110, "dimmable smart lightbulb");
 
 impl<T: Protocol> Switch for LB110<T> {
@@ -164,6 +169,8 @@ pub enum Device {
     HS105(HS105<DefaultProtocol>),
     /// Device variant for an HS110 smart plug
     HS110(HS110<DefaultProtocol>),
+    /// Device variant for an HS300 smart power strip
+    HS300(HS300<DefaultProtocol>),
     /// Device variant for an LB110 smart light
     LB110(LB110<DefaultProtocol>),
     /// Device variant for an unknown device
@@ -181,6 +188,8 @@ impl Device {
             Device::HS105(HS105::from_addr(addr))
         } else if model.contains("HS110") {
             Device::HS110(HS110::from_addr(addr))
+        } else if model.contains("HS300") {
+            Device::HS300(HS300::from_addr(addr))
         } else if model.contains("LB110") {
             Device::LB110(LB110::from_addr(addr))
         } else {
@@ -195,6 +204,7 @@ impl DeviceActions for Device {
             Device::HS100(d) => d.send(msg),
             Device::HS105(d) => d.send(msg),
             Device::HS110(d) => d.send(msg),
+            Device::HS300(d) => d.send(msg),
             Device::LB110(d) => d.send(msg),
             Device::Unknown(d) => d.send(msg),
         }
