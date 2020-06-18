@@ -23,7 +23,7 @@ use std::{
 use serde::de::DeserializeOwned;
 
 use crate::{
-    capabilities::{DeviceActions, Dimmer, Emeter, Light, Switch},
+    capabilities::{DeviceActions, Dimmer, Emeter, Light, Switch, MultiSwitch},
     datatypes::DeviceData,
     error::Result,
     protocol::{DefaultProtocol, Protocol},
@@ -129,7 +129,7 @@ impl<T: Protocol> Emeter for HS110<T> {}
 
 new_device!(HS300, "smart power strip with energy monitoring");
 
-impl<T: Protocol> Switch for HS300<T> {}
+impl<T: Protocol> MultiSwitch for HS300<T> {}
 impl<T: Protocol> Emeter for HS300<T> {}
 
 new_device!(LB110, "dimmable smart lightbulb");

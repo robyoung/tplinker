@@ -126,6 +126,64 @@ pub trait Switch: DeviceActions {
     }
 }
 
+/// Devices that have multiple outlets which can be switched on or off
+///
+/// This is supported by power strips like the HS300
+pub trait MultiSwitch: DeviceActions {
+    /// Check whether the specified outlet is on
+    fn is_on(&self, index: usize) -> Result<bool> {
+        if let Some(children) = self.sysinfo()?.children {
+            if let Some(child) = children.get(index) {
+                Ok(child.state > 0)
+            }
+            else {
+                Err(Error::Other(String::from("Invalid outlet index")))
+            }
+        } else {
+            Err(Error::Other(String::from("No relay state")))
+        }
+    }
+
+    /// Check whether the specified outlet is off
+    fn is_off(&self, index: usize) -> Result<bool> {
+        Ok(!self.is_on(index)?)
+    }
+
+    /// Switch the specified outlet on
+    fn switch_on(&self, index: usize) -> Result<()> {
+        self.switch(index, true)
+    }
+
+    /// Switch the specified outlet off
+    fn switch_off(&self, index: usize) -> Result<()> {
+        self.switch(index, false)
+    }
+
+    /// Switch the specified outlet to a particular on/off value
+    fn switch(&self, index: usize, on: bool) -> Result<()> {
+        let id = format!("{}{:0>2}", self.sysinfo()?.device_id, index);
+        let state = if on { 1 } else { 0 };
+        check_command_error(
+            self.send(&json!({"context": {"child_ids": [id]}, "system": {"set_relay_state": {"state": state}}}).to_string())?,
+            "/system/set_relay_state/err_code",
+        )
+    }
+
+    /// Toggle the specified outlet's on state
+    ///
+    /// If the specified outlet is on, switch it off.
+    /// If the specified outlet is off, switch it on.
+    fn toggle(&self, index: usize) -> Result<bool> {
+        if self.is_on(index)? {
+            self.switch_off(index)?;
+            Ok(false)
+        } else {
+            self.switch_on(index)?;
+            Ok(true)
+        }
+    }
+}
+
 /// Smart light devices
 ///
 /// The LB class of devices support this trait.
