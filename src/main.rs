@@ -4,9 +4,9 @@ use clap::{App, AppSettings, Arg, SubCommand};
 use serde_json::{json, to_string as stringify, Value};
 
 use tplinker::{
-    capabilities::{DeviceActions, Switch},
+    capabilities::{DeviceActions, Switch, MultiSwitch},
     datatypes::{DeviceData, SysInfo},
-    devices::{Device, RawDevice, HS100, HS110, LB110},
+    devices::{Device, RawDevice, HS100, HS105, HS110, HS300, LB110},
     error::Result as TpResult,
 };
 
@@ -76,7 +76,7 @@ fn command_set_alias(addr: SocketAddr, alias: &str, format: Format) -> Vec<Value
         })
 }
 
-fn command_switch_toggle(addr: SocketAddr, state: &str, format: Format) -> Vec<Value> {
+fn command_switch_toggle(addr: SocketAddr, state: &str, index: Option<usize>, format: Format) -> Vec<Value> {
     let (expected, statename) = match state {
         "toggle" => (None, "Toggled"),
         "on" => (Some(true), "Switched on"),
@@ -86,7 +86,7 @@ fn command_switch_toggle(addr: SocketAddr, state: &str, format: Format) -> Vec<V
 
     device_from_addr(addr)
         .and_then(|(addr, dev, _info)| {
-            let actual = device_is_on(&dev).unwrap();
+            let actual = device_is_on(&dev, index).unwrap();
             let expected = match expected {
                 None => !actual,
                 Some(e) => e,
@@ -97,14 +97,16 @@ fn command_switch_toggle(addr: SocketAddr, state: &str, format: Format) -> Vec<V
             } else {
                 match &dev {
                     Device::HS100(s) => toggle_switch(s, state),
+                    Device::HS105(s) => toggle_switch(s, state),
                     Device::HS110(s) => toggle_switch(s, state),
+                    Device::HS300(s) if index.is_some() => toggle_multiswitch(s, state, index.unwrap()),
                     Device::LB110(s) => toggle_switch(s, state),
                     _ => panic!("not a switchable device: {}", addr),
                 }
                 .map(|_| Value::Bool(true))
                 .unwrap_or_else(|err| {
                     // In case it errors but has actually succeeded
-                    let current = device_is_on(&dev).unwrap();
+                    let current = device_is_on(&dev, index).unwrap();
                     if expected == current {
                         Value::Bool(true)
                     } else {
@@ -131,10 +133,18 @@ fn device_from_addr(addr: SocketAddr) -> TpResult<(SocketAddr, Device, SysInfo)>
         let dev = HS100::from_raw(raw);
         let info = dev.sysinfo()?;
         (Device::HS100(dev), info)
+    } else if info.model.starts_with("HS105") {
+        let dev = HS105::from_raw(raw);
+        let info = dev.sysinfo()?;
+        (Device::HS105(dev), info)
     } else if info.model.starts_with("HS110") {
         let dev = HS110::from_raw(raw);
         let info = dev.sysinfo()?;
         (Device::HS110(dev), info)
+    } else if info.model.starts_with("HS300") {
+        let dev = HS300::from_raw(raw);
+        let info = dev.sysinfo()?;
+        (Device::HS300(dev), info)
     } else if info.model.starts_with("LB110") {
         let dev = LB110::from_raw(raw);
         let info = dev.sysinfo()?;
@@ -151,10 +161,12 @@ fn pad(value: &str, padding: usize) -> String {
     format!("{}{}", value, pad)
 }
 
-fn device_is_on(device: &Device) -> Option<bool> {
+fn device_is_on(device: &Device, index: Option<usize>) -> Option<bool> {
     match device {
         Device::HS100(device) => device.is_on().ok(),
+        Device::HS105(device) => device.is_on().ok(),
         Device::HS110(device) => device.is_on().ok(),
+        Device::HS300(device) if index.is_some() => device.is_on(index.unwrap()).ok(),
         Device::LB110(device) => device.is_on().ok(),
         _ => None,
     }
@@ -165,6 +177,15 @@ fn toggle_switch<S: Switch>(switch: &S, state: &str) -> TpResult<bool> {
         "on" => switch.switch_on().and(Ok(true)),
         "off" => switch.switch_off().and(Ok(false)),
         "toggle" => switch.toggle(),
+        _ => unreachable!(),
+    }
+}
+
+fn toggle_multiswitch<S: MultiSwitch>(switch: &S, state: &str, index: usize) -> TpResult<bool> {
+    match state {
+        "on" => switch.switch_on(index).and(Ok(true)),
+        "off" => switch.switch_off(index).and(Ok(false)),
+        "toggle" => switch.toggle(index),
         _ => unreachable!(),
     }
 }
@@ -295,7 +316,7 @@ impl Format {
                 ["Product", sysinfo.dev_name],
                 ["Model", sysinfo.model],
                 ["Signal", format!("{} dB", sysinfo.rssi)],
-                ["On?", device_is_on(&device)],
+                ["On?", device_is_on(&device, None)],
             ]),
             Format::Long => {
                 let (lat, lon) = device
@@ -315,7 +336,7 @@ impl Format {
                     ["Latitude", lat],
                     ["Longitude", lon],
                     ["Mode", sysinfo.active_mode],
-                    ["On?", device_is_on(&device)],
+                    ["On?", device_is_on(&device, None)],
                 ])
             }
             Format::JSON => {
@@ -376,7 +397,9 @@ impl Format {
     fn device(device: Device) -> &'static str {
         match device {
             Device::HS100(_) => "HS100",
+            Device::HS105(_) => "HS105",
             Device::HS110(_) => "HS110",
+            Device::HS300(_) => "HS300",
             Device::LB110(_) => "LB110",
             Device::Unknown(_) => "unknown",
         }
@@ -444,6 +467,11 @@ fn main() {
                         .possible_values(&["on", "off", "toggle"])
                         .default_value("toggle")
                         .required(true),
+                )
+                .arg(
+                    Arg::with_name("index")
+                        .default_value("0")
+                        .required(false),
                 ),
         )
         .get_matches();
@@ -503,7 +531,8 @@ fn main() {
         ("switch", Some(matches)) => {
             let address = parse_address(matches.value_of("address").unwrap());
             let state = matches.value_of("state").unwrap();
-            command_switch_toggle(address, state, format)
+            let index = matches.value_of("index").and_then(|index| index.parse::<usize>().ok());
+            command_switch_toggle(address, state, index, format)
         }
         _ => unreachable!(),
     })
