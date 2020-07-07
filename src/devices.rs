@@ -23,7 +23,7 @@ use std::{
 use serde::de::DeserializeOwned;
 
 use crate::{
-    capabilities::{DeviceActions, Dimmer, Emeter, Light, Switch, MultiSwitch},
+    capabilities::{DeviceActions, Dimmer, Emeter, Light, MultiSwitch, Switch},
     datatypes::DeviceData,
     error::Result,
     protocol::{DefaultProtocol, Protocol},

@@ -140,8 +140,7 @@ pub trait MultiSwitch: DeviceActions {
         if let Some(children) = self.sysinfo()?.children {
             if let Some(child) = children.get(index) {
                 Ok(child.state > 0)
-            }
-            else {
+            } else {
                 Err(Error::Other(String::from("Invalid outlet index")))
             }
         } else {
