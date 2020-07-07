@@ -35,6 +35,11 @@ const QUERY: &str = r#"{
 }"#;
 
 /// Discover TPLink smart devices on the local network
+///
+/// # Errors
+///
+/// Will return `Err` if there is a `io::Error` communicating with the device or
+/// a problem decoding the response.
 pub fn with_timeout(timeout: Option<Duration>) -> Result<Vec<(SocketAddr, DeviceData)>> {
     let socket = UdpSocket::bind("0.0.0.0:0")?;
     socket.set_broadcast(true)?;
@@ -62,6 +67,10 @@ pub fn with_timeout(timeout: Option<Duration>) -> Result<Vec<(SocketAddr, Device
 /// Discover TPLink smart devices on the local network
 ///
 /// Uses the default timeout of 3 seconds.
+///
+/// # Errors
+///
+/// Will return `Err` if [`with_timeout`](with_timeout) returns an `Err`.
 pub fn discover() -> Result<Vec<(SocketAddr, DeviceData)>> {
     with_timeout(Some(Duration::from_secs(3)))
 }

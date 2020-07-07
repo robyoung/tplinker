@@ -15,11 +15,16 @@ use crate::{
     error::{Error, Result},
 };
 
-/// The basic set of functions available to all TPlink smart devices
+/// The basic set of functions available to all TPLink smart devices
 ///
 /// All devices support this trait.
 pub trait DeviceActions {
     /// Send a message to a device and return its parsed response
+    ///
+    /// # Errors
+    ///
+    /// Will return `Err` if there is a `io::Error` communicating with the device or
+    /// a problem decoding the response.
     fn send<T: DeserializeOwned>(&self, msg: &str) -> Result<T>;
 
     /// Get system information
@@ -44,7 +49,7 @@ pub trait DeviceActions {
             "system": {"set_dev_alias": {"alias": alias}}
         })
         .to_string();
-        check_command_error(self.send(&command)?, "/system/set_dev_alias/err_code")
+        check_command_error(&self.send(&command)?, "/system/set_dev_alias/err_code")
     }
 
     /// Get the latitude and longitude coordinates
@@ -73,7 +78,7 @@ pub trait DeviceActions {
         })
         .to_string();
 
-        check_command_error(self.send(&command)?, "/system/reboot/err_code")
+        check_command_error(&self.send(&command)?, "/system/reboot/err_code")
     }
 }
 
@@ -98,7 +103,7 @@ pub trait Switch: DeviceActions {
     /// Switch the device on
     fn switch_on(&self) -> Result<()> {
         check_command_error(
-            self.send(&r#"{"system":{"set_relay_state":{"state":1}}}"#)?,
+            &self.send(&r#"{"system":{"set_relay_state":{"state":1}}}"#)?,
             "/system/set_relay_state/err_code",
         )
     }
@@ -106,7 +111,7 @@ pub trait Switch: DeviceActions {
     /// Switch the device off
     fn switch_off(&self) -> Result<()> {
         check_command_error(
-            self.send(&r#"{"system":{"set_relay_state":{"state":0}}}"#)?,
+            &self.send(&r#"{"system":{"set_relay_state":{"state":0}}}"#)?,
             "/system/set_relay_state/err_code",
         )
     }
@@ -164,7 +169,7 @@ pub trait MultiSwitch: DeviceActions {
         let id = format!("{}{:0>2}", self.sysinfo()?.device_id, index);
         let state = if on { 1 } else { 0 };
         check_command_error(
-            self.send(&json!({"context": {"child_ids": [id]}, "system": {"set_relay_state": {"state": state}}}).to_string())?,
+            &self.send(&json!({"context": {"child_ids": [id]}, "system": {"set_relay_state": {"state": state}}}).to_string())?,
             "/system/set_relay_state/err_code",
         )
     }
@@ -330,7 +335,7 @@ pub trait Emeter: DeviceActions {
 }
 
 /// Check the error code of a standard command
-fn check_command_error(value: serde_json::Value, pointer: &str) -> Result<()> {
+fn check_command_error(value: &serde_json::Value, pointer: &str) -> Result<()> {
     if let Some(err_code) = value.pointer(pointer) {
         if err_code == 0 {
             Ok(())
