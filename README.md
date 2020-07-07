@@ -1,5 +1,17 @@
 # TPLinker
 
+
+[![GitHub Actions][gh-image]][gh-checks]
+[![crates.io][cratesio-image]][cratesio]
+[![docs.rs][docsrs-image]][docsrs]
+
+[gh-image]: https://github.com/robyoung/tplinker/workflows/Test/badge.svg
+[gh-checks]: https://github.com/robyoung/tplinker/actions?query=workflow%3ATest
+[cratesio-image]: https://img.shields.io/crates/v/tplinker.svg
+[cratesio]: https://crates.io/crates/tplinker
+[docsrs-image]: https://docs.rs/tplinker/badge.svg
+[docsrs]: https://docs.rs/tplinker
+
 A rust library to query and control TPLink smart plugs and smart lights.
 
 Supported devices include HS100, HS110, LB110.
