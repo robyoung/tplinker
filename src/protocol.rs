@@ -18,6 +18,7 @@ pub fn encrypt(plain: &str) -> Result<Vec<u8>, Error> {
     let len = plain.len();
     let msgbytes = plain.as_bytes();
     let mut cipher = vec![];
+    #[allow(clippy::cast_possible_truncation)]
     cipher.write_u32::<BigEndian>(len as u32)?;
 
     let mut key = 0xAB;

@@ -1,8 +1,8 @@
-//! A library to query and control TPLink smart devices on the local network.
+//! A library to query and control `TPLink` smart devices on the local network.
 //!
 //! Supported devices include HS100, HS110, LB110.
 //!
-//! Inspired and influenced by [pyHS100](https://github.com/GadgetReactor/pyHS100) and
+//! Inspired and influenced by [`pyHS100`](https://github.com/GadgetReactor/pyHS100) and
 //! [hs100api](https://github.com/abronan/hs100-rust-api).
 //!
 //! # Usage
@@ -15,7 +15,7 @@
 //!
 //! ## Discovery
 //!
-//! To see all TPLink smart devices on the local network use
+//! To see all `TPLink` smart devices on the local network use
 //! [`discovery::discover`](./discovery/fn.discover.html).
 //!
 //! ```no_run
@@ -62,7 +62,11 @@
 //! traits from [`capabilities`](./capabilities/index.html).
 
 #![deny(missing_docs, clippy::pedantic)]
-#![allow(clippy::module_name_repetitions)]
+#![allow(
+    clippy::module_name_repetitions,
+    clippy::must_use_candidate,
+    clippy::missing_errors_doc
+)]
 
 extern crate byteorder;
 

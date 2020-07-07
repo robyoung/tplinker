@@ -4,7 +4,7 @@ use clap::{App, AppSettings, Arg, SubCommand};
 use serde_json::{json, to_string as stringify, Value};
 
 use tplinker::{
-    capabilities::{DeviceActions, Switch, MultiSwitch},
+    capabilities::{DeviceActions, MultiSwitch, Switch},
     datatypes::{DeviceData, SysInfo},
     devices::{Device, RawDevice, HS100, HS105, HS110, HS300, LB110},
     error::Result as TpResult,
@@ -76,7 +76,12 @@ fn command_set_alias(addr: SocketAddr, alias: &str, format: Format) -> Vec<Value
         })
 }
 
-fn command_switch_toggle(addr: SocketAddr, state: &str, index: Option<usize>, format: Format) -> Vec<Value> {
+fn command_switch_toggle(
+    addr: SocketAddr,
+    state: &str,
+    index: Option<usize>,
+    format: Format,
+) -> Vec<Value> {
     let (expected, statename) = match state {
         "toggle" => (None, "Toggled"),
         "on" => (Some(true), "Switched on"),
@@ -99,7 +104,9 @@ fn command_switch_toggle(addr: SocketAddr, state: &str, index: Option<usize>, fo
                     Device::HS100(s) => toggle_switch(s, state),
                     Device::HS105(s) => toggle_switch(s, state),
                     Device::HS110(s) => toggle_switch(s, state),
-                    Device::HS300(s) if index.is_some() => toggle_multiswitch(s, state, index.unwrap()),
+                    Device::HS300(s) if index.is_some() => {
+                        toggle_multiswitch(s, state, index.unwrap())
+                    }
                     Device::LB110(s) => toggle_switch(s, state),
                     _ => panic!("not a switchable device: {}", addr),
                 }
@@ -468,11 +475,7 @@ fn main() {
                         .default_value("toggle")
                         .required(true),
                 )
-                .arg(
-                    Arg::with_name("index")
-                        .default_value("0")
-                        .required(false),
-                ),
+                .arg(Arg::with_name("index").default_value("0").required(false)),
         )
         .get_matches();
 
@@ -531,7 +534,9 @@ fn main() {
         ("switch", Some(matches)) => {
             let address = parse_address(matches.value_of("address").unwrap());
             let state = matches.value_of("state").unwrap();
-            let index = matches.value_of("index").and_then(|index| index.parse::<usize>().ok());
+            let index = matches
+                .value_of("index")
+                .and_then(|index| index.parse::<usize>().ok());
             command_switch_toggle(address, state, index, format)
         }
         _ => unreachable!(),
