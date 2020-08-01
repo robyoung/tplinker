@@ -26,7 +26,7 @@ use std::{
 use crate::{datatypes::DeviceData, error::Result, protocol};
 
 // TODO: consider moving this to query builder
-const QUERY: &str = r#"{
+pub(crate) const QUERY: &str = r#"{
     "system": {"get_sysinfo": null},
     "emeter": {"get_realtime": null},
     "smartlife.iot.dimmer": {"get_dimmer_parameters": null},

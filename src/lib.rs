@@ -78,6 +78,8 @@ pub mod datatypes;
 pub mod devices;
 pub mod discovery;
 pub mod error;
+#[cfg(feature = "async")]
+pub mod tokio;
 mod protocol;
 
 pub use discovery::discover;
