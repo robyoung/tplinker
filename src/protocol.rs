@@ -57,7 +57,7 @@ pub trait Protocol: Send {
     fn send(&self, ip: SocketAddr, msg: &str) -> Result<String, Error>;
 }
 
-#[derive(Default)]
+#[derive(Default, Clone, Debug)]
 pub struct DefaultProtocol;
 
 impl Protocol for DefaultProtocol {

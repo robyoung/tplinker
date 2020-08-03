@@ -32,6 +32,7 @@ use crate::{
 // DEVICES
 
 /// A raw, generic smart device
+#[derive(Clone, Debug)]
 pub struct RawDevice<T: Protocol> {
     addr: SocketAddr,
     protocol: T,
@@ -79,6 +80,7 @@ macro_rules! new_device {
       => raw # $docraw:expr
       => addr # $docaddr:expr ) => {
         #[doc = $docmain]
+        #[derive(Clone, Debug)]
         pub struct $x<T: Protocol> {
             raw: RawDevice<T>,
         }
@@ -162,6 +164,7 @@ impl<T: Protocol> Emeter for LB110<T> {
 /// This is returned from [`discover`](../discovery/fn.discover.html).
 /// If the device type is not recognised but we can parse the response the
 /// `Unknown` variant is returned.
+#[derive(Clone, Debug)]
 pub enum Device {
     /// Device variant for an HS100 smart plug
     HS100(HS100<DefaultProtocol>),
