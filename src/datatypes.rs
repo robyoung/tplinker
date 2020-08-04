@@ -76,25 +76,25 @@ pub struct Smartlife {
 
 impl Smartlife {
     pub fn emeter(&self) -> Result<&SmartlifeEmeter> {
-        if let Some(emeter) = &self.emeter {
-            match emeter {
+        self.emeter.as_ref().map_or(
+            Err(Error::from("No emeter present")),
+            |emeter| match emeter {
                 SectionResult::Ok(emeter) => Ok(emeter),
                 SectionResult::Err(err) => Err(Error::from(err.clone())),
-            }
-        } else {
-            Err(Error::Other(String::from("No emeter present")))
-        }
+            },
+        )
     }
 
     pub fn lightingservice(&self) -> Result<&SmartlifeLightingService> {
-        if let Some(l) = &self.lightingservice {
-            match l {
-                SectionResult::Ok(l) => Ok(l),
-                SectionResult::Err(err) => Err(Error::from(err.clone())),
-            }
-        } else {
-            Err(Error::Other(String::from("No lighting service present")))
-        }
+        self.lightingservice
+            .as_ref()
+            .map_or(
+                Err(Error::from("No lighting service present")),
+                |l| match l {
+                    SectionResult::Ok(l) => Ok(l),
+                    SectionResult::Err(err) => Err(Error::from(err.clone())),
+                },
+            )
     }
 }
 
@@ -188,19 +188,12 @@ pub struct SysInfoChild {
 
 impl SysInfo {
     pub fn is_dimmable(&self) -> bool {
-        if let Some(is_dimmable) = self.is_dimmable {
-            is_dimmable == 1
-        } else {
-            false
-        }
+        self.is_dimmable
+            .map_or(false, |is_dimmable| is_dimmable == 1)
     }
 
     pub fn is_color(&self) -> bool {
-        if let Some(is_color) = self.is_color {
-            is_color == 1
-        } else {
-            false
-        }
+        self.is_color.map_or(false, |is_color| is_color == 1)
     }
 }
 

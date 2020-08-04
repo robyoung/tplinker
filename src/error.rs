@@ -51,6 +51,12 @@ impl From<serde_json::Error> for Error {
     }
 }
 
+impl From<&str> for Error {
+    fn from(error: &str) -> Self {
+        Error::from(String::from(error))
+    }
+}
+
 impl From<String> for Error {
     fn from(error: String) -> Self {
         Error::Other(error)

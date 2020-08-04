@@ -62,7 +62,7 @@ pub trait DeviceActions {
         {
             Ok((f64::from(latitude_i), f64::from(longitude_i)))
         } else {
-            Err(Error::Other(String::from("Complete coordinates not found")))
+            Err(Error::from("Complete coordinates not found"))
         }
     }
 
@@ -88,11 +88,10 @@ pub trait DeviceActions {
 pub trait Switch: DeviceActions {
     /// Check whether the device is on
     fn is_on(&self) -> Result<bool> {
-        if let Some(relay_state) = self.sysinfo()?.relay_state {
-            Ok(relay_state > 0)
-        } else {
-            Err(Error::Other(String::from("No relay state")))
-        }
+        self.sysinfo()?.relay_state.map_or(
+            Err(Error::from("No relay state")),
+            |relay_state| Ok(relay_state > 0),
+        )
     }
 
     /// Check whether the device is off
@@ -137,15 +136,16 @@ pub trait Switch: DeviceActions {
 pub trait MultiSwitch: DeviceActions {
     /// Check whether the specified outlet is on
     fn is_on(&self, index: usize) -> Result<bool> {
-        if let Some(children) = self.sysinfo()?.children {
-            if let Some(child) = children.get(index) {
-                Ok(child.state > 0)
-            } else {
-                Err(Error::Other(String::from("Invalid outlet index")))
-            }
-        } else {
-            Err(Error::Other(String::from("No relay state")))
-        }
+        self.sysinfo()?.children.map_or(
+            Err(Error::from("No relay state")),
+            |children| {
+                children
+                    .get(index)
+                    .map_or(Err(Error::from("Invalid outlet index")), |child| {
+                        Ok(child.state > 0)
+                    })
+            },
+        )
     }
 
     /// Check whether the specified outlet is off
@@ -230,9 +230,9 @@ pub trait Dimmer: Light {
     /// Set percentage brightness of bulb
     fn set_brightness(&self, brightness: u16) -> Result<()> {
         if brightness > 100 {
-            Err(Error::Other(String::from(
+            Err(Error::from(
                 "Brightness must be between 0 and 100",
-            )))
+            ))
         } else {
             self.set_light_state(SetLightState {
                 on_off: None,
@@ -267,17 +267,17 @@ pub trait Colour: Light {
     /// Brightness must be between 0 and 100.
     fn set_hsv(&self, hue: u16, saturation: u16, brightness: u16) -> Result<()> {
         if hue > 360 {
-            return Err(Error::Other(String::from("Hue must be between 0 and 360")));
+            return Err(Error::from("Hue must be between 0 and 360"));
         }
         if saturation > 100 {
-            return Err(Error::Other(String::from(
+            return Err(Error::from(
                 "Saturation must be between 0 and 100",
-            )));
+            ));
         }
         if brightness > 100 {
-            return Err(Error::Other(String::from(
+            return Err(Error::from(
                 "Brightness must be between 0 and 100",
-            )));
+            ));
         }
         self.set_light_state(SetLightState {
             on_off: None,
@@ -313,7 +313,7 @@ pub trait Emeter: DeviceActions {
     // TODO: add proper return type
     fn get_emeter_daily(&self, year: u16, month: u8) -> Result<serde_json::Value> {
         if month > 12 {
-            return Err(Error::Other("Month must be less than 12".to_string()));
+            return Err(Error::from("Month must be less than 12"));
         }
         let command = json!({
             self.emeter_type(): {"get_daystat": {"month": month, "year": year}}
@@ -339,10 +339,10 @@ fn check_command_error(value: &serde_json::Value, pointer: &str) -> Result<()> {
         if err_code == 0 {
             Ok(())
         } else {
-            Err(Error::Other(format!("Invalid error code {}", err_code)))
+            Err(Error::from(format!("Invalid error code {}", err_code)))
         }
     } else {
-        Err(Error::Other(format!("Invalid response format: {}", value)))
+        Err(Error::from(format!("Invalid response format: {}", value)))
     }
 }
 
