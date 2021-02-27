@@ -98,8 +98,12 @@ pub fn with_timeout(timeout: Option<Duration>) -> Result<Vec<(SocketAddr, Device
             .collect::<Vec<_>>();
         handles
             .into_iter()
-            .filter_map(|join_handle| join_handle.join().ok().and_then(|r| r.ok()))
-            .flat_map(|addresses| addresses)
+            .flat_map(|join_handle| {
+                join_handle.join().ok().and_then(Result::ok).map_or_else(
+                    || HashMap::<SocketAddr, DeviceData>::new().into_iter(),
+                    std::iter::IntoIterator::into_iter,
+                )
+            })
             .collect::<Vec<_>>()
     })
     .map_err(|_e| Error::Other("cannot discover devices".to_string()))
