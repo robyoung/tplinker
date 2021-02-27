@@ -300,7 +300,7 @@ pub trait Emeter: DeviceActions {
             self.emeter_type(): {"get_realtime": null}
         })
         .to_string();
-        Ok(self.send(&command)?)
+        self.send(&command)
     }
 
     /// Get the daily energy usage for a given month
@@ -313,7 +313,7 @@ pub trait Emeter: DeviceActions {
             self.emeter_type(): {"get_daystat": {"month": month, "year": year}}
         })
         .to_string();
-        Ok(self.send(&command)?)
+        self.send(&command)
     }
 
     /// Get the monthly energy usage for a given year
@@ -323,7 +323,7 @@ pub trait Emeter: DeviceActions {
             self.emeter_type(): {"get_monthstat": {"year": year}}
         })
         .to_string();
-        Ok(self.send(&command)?)
+        self.send(&command)
     }
 }
 
