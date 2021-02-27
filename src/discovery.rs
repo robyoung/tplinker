@@ -45,7 +45,7 @@ fn can_interface_broadcast(iface: Interface) -> Option<(Ipv4Addr, Ipv4Addr)> {
             (false, Some(broadcast)) => Some((addr.ip, broadcast)),
             _ => None,
         },
-        _ => None,
+        IfAddr::V6(_) => None,
     }
 }
 
@@ -53,7 +53,7 @@ fn discover_on_interface(
     timeout: Option<Duration>,
     ip: Ipv4Addr,
     broadcast: Ipv4Addr,
-    request: &Vec<u8>,
+    request: &[u8],
 ) -> Result<HashMap<SocketAddr, DeviceData>> {
     let socket_addr = SocketAddr::new(IpAddr::V4(ip), 0);
     let udp_socket = UdpSocket::bind(socket_addr)?;
@@ -87,10 +87,13 @@ pub fn with_timeout(timeout: Option<Duration>) -> Result<Vec<(SocketAddr, Device
     thread::scope(|s| {
         let handles = addrs
             .into_iter()
-            .filter_map(can_interface_broadcast)
-            .map(|(ip, broadcast)| {
-                let request = &request;
-                s.spawn(move |_| discover_on_interface(timeout, ip, broadcast, request))
+            .filter_map(|intf| {
+                if let Some((ip, broadcast)) = can_interface_broadcast(intf) {
+                    let request = &request;
+                    Some(s.spawn(move |_| discover_on_interface(timeout, ip, broadcast, request)))
+                } else {
+                    None
+                }
             })
             .collect::<Vec<_>>();
         handles
