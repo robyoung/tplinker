@@ -61,7 +61,7 @@ fn discover_on_interface(
     udp_socket.set_read_timeout(timeout)?;
     let dest_socket_addr = SocketAddr::new(IpAddr::V4(broadcast), 9999);
     for _ in 0..3 {
-        let _ = udp_socket.send_to(&request[4..request.len()], dest_socket_addr);
+        let _send_res = udp_socket.send_to(&request[4..request.len()], dest_socket_addr);
     }
 
     let mut buf = [0_u8; 4096];
