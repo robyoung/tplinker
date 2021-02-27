@@ -81,6 +81,11 @@ fn discover_on_interface(
 ///
 /// Will return `Err` if there is a `io::Error` communicating with the device or
 /// a problem decoding the response.
+///
+/// # Panics
+///
+/// Will panic if protocol encryption fails.
+#[allow(clippy::needless_collect)] // needed for achieving parallelism
 pub fn with_timeout(timeout: Option<Duration>) -> Result<Vec<(SocketAddr, DeviceData)>> {
     let request = protocol::encrypt(QUERY).unwrap();
     let addrs = if_addrs::get_if_addrs()?;
