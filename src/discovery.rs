@@ -37,7 +37,7 @@ const QUERY: &str = r#"{
     "smartlife.iot.dimmer": {"get_dimmer_parameters": null},
     "smartlife.iot.common.emeter": {"get_realtime": null},
     "smartlife.iot.smartbulb.lightingservice": {"get_light_state": null}
-    }"#;
+}"#;
 
 fn can_interface_broadcast(iface: Interface) -> Option<(Ipv4Addr, Ipv4Addr)> {
     match iface.addr {
