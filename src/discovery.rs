@@ -23,7 +23,7 @@ use std::{
     time::Duration,
 };
 
-use crossbeam::thread::{self};
+use crossbeam::thread;
 use if_addrs::{IfAddr, Interface};
 
 use crate::error::Error;
