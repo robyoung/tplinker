@@ -23,7 +23,7 @@ use std::{
     time::Duration,
 };
 
-use crossbeam::thread;
+use crossbeam::thread::{self};
 use if_addrs::{IfAddr, Interface};
 
 use crate::error::Error;
@@ -37,7 +37,7 @@ const QUERY: &str = r#"{
     "smartlife.iot.dimmer": {"get_dimmer_parameters": null},
     "smartlife.iot.common.emeter": {"get_realtime": null},
     "smartlife.iot.smartbulb.lightingservice": {"get_light_state": null}
-}"#;
+    }"#;
 
 fn can_interface_broadcast(iface: Interface) -> Option<(Ipv4Addr, Ipv4Addr)> {
     match iface.addr {
@@ -81,10 +81,6 @@ fn discover_on_interface(
 ///
 /// Will return `Err` if there is a `io::Error` communicating with the device or
 /// a problem decoding the response.
-///
-/// # Panics
-///
-/// Will panic if protocol encryption fails.
 #[allow(clippy::needless_collect)] // needed for achieving parallelism
 pub fn with_timeout(timeout: Option<Duration>) -> Result<Vec<(SocketAddr, DeviceData)>> {
     let request = protocol::encrypt(QUERY).unwrap();
@@ -92,23 +88,16 @@ pub fn with_timeout(timeout: Option<Duration>) -> Result<Vec<(SocketAddr, Device
     thread::scope(|s| {
         let handles = addrs
             .into_iter()
-            .filter_map(|intf| {
-                if let Some((ip, broadcast)) = can_interface_broadcast(intf) {
-                    let request = &request;
-                    Some(s.spawn(move |_| discover_on_interface(timeout, ip, broadcast, request)))
-                } else {
-                    None
-                }
+            .filter_map(can_interface_broadcast)
+            .map(|(ip, broadcast)| {
+                let request = &request;
+                s.spawn(move |_| discover_on_interface(timeout, ip, broadcast, request))
             })
             .collect::<Vec<_>>();
         handles
             .into_iter()
-            .flat_map(|join_handle| {
-                join_handle.join().ok().and_then(Result::ok).map_or_else(
-                    || HashMap::<SocketAddr, DeviceData>::new().into_iter(),
-                    std::iter::IntoIterator::into_iter,
-                )
-            })
+            .filter_map(|join_handle| join_handle.join().ok().and_then(Result::ok))
+            .flat_map(|addresses| addresses)
             .collect::<Vec<_>>()
     })
     .map_err(|_e| Error::Other("cannot discover devices".to_string()))

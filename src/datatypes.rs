@@ -34,9 +34,6 @@ pub enum SectionResult<T> {
 }
 
 impl<T> SectionResult<T> {
-    /// # Panics
-    ///
-    /// If section is missing  
     pub fn unwrap(self) -> T {
         match self {
             Self::Ok(section) => section,
@@ -211,9 +208,6 @@ pub struct LightState {
 }
 
 impl LightState {
-    /// # Panics
-    ///
-    /// If `dft_on_state` is missing
     pub fn dft_on_state(&self) -> &DftOnState {
         if let Some(dft_on_state) = &self.dft_off_on_state {
             dft_on_state
