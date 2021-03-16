@@ -88,10 +88,11 @@ pub trait DeviceActions {
 pub trait Switch: DeviceActions {
     /// Check whether the device is on
     fn is_on(&self) -> Result<bool> {
-        self.sysinfo()?.relay_state.map_or(
-            Err(Error::from("No relay state")),
-            |relay_state| Ok(relay_state > 0),
-        )
+        self.sysinfo()?
+            .relay_state
+            .map_or(Err(Error::from("No relay state")), |relay_state| {
+                Ok(relay_state > 0)
+            })
     }
 
     /// Check whether the device is off
@@ -136,16 +137,15 @@ pub trait Switch: DeviceActions {
 pub trait MultiSwitch: DeviceActions {
     /// Check whether the specified outlet is on
     fn is_on(&self, index: usize) -> Result<bool> {
-        self.sysinfo()?.children.map_or(
-            Err(Error::from("No relay state")),
-            |children| {
+        self.sysinfo()?
+            .children
+            .map_or(Err(Error::from("No relay state")), |children| {
                 children
                     .get(index)
                     .map_or(Err(Error::from("Invalid outlet index")), |child| {
                         Ok(child.state > 0)
                     })
-            },
-        )
+            })
     }
 
     /// Check whether the specified outlet is off
@@ -230,9 +230,7 @@ pub trait Dimmer: Light {
     /// Set percentage brightness of bulb
     fn set_brightness(&self, brightness: u16) -> Result<()> {
         if brightness > 100 {
-            Err(Error::from(
-                "Brightness must be between 0 and 100",
-            ))
+            Err(Error::from("Brightness must be between 0 and 100"))
         } else {
             self.set_light_state(SetLightState {
                 on_off: None,
@@ -270,14 +268,10 @@ pub trait Colour: Light {
             return Err(Error::from("Hue must be between 0 and 360"));
         }
         if saturation > 100 {
-            return Err(Error::from(
-                "Saturation must be between 0 and 100",
-            ));
+            return Err(Error::from("Saturation must be between 0 and 100"));
         }
         if brightness > 100 {
-            return Err(Error::from(
-                "Brightness must be between 0 and 100",
-            ));
+            return Err(Error::from("Brightness must be between 0 and 100"));
         }
         self.set_light_state(SetLightState {
             on_off: None,
@@ -306,7 +300,7 @@ pub trait Emeter: DeviceActions {
             self.emeter_type(): {"get_realtime": null}
         })
         .to_string();
-        Ok(self.send(&command)?)
+        self.send(&command)
     }
 
     /// Get the daily energy usage for a given month
@@ -319,7 +313,7 @@ pub trait Emeter: DeviceActions {
             self.emeter_type(): {"get_daystat": {"month": month, "year": year}}
         })
         .to_string();
-        Ok(self.send(&command)?)
+        self.send(&command)
     }
 
     /// Get the monthly energy usage for a given year
@@ -329,7 +323,7 @@ pub trait Emeter: DeviceActions {
             self.emeter_type(): {"get_monthstat": {"year": year}}
         })
         .to_string();
-        Ok(self.send(&command)?)
+        self.send(&command)
     }
 }
 

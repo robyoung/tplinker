@@ -216,6 +216,7 @@ fn human_stringify(value: &Value) -> String {
 enum Format {
     Short,
     Long,
+    #[allow(clippy::upper_case_acronyms)]
     JSON,
 }
 
