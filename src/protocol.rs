@@ -88,7 +88,6 @@ impl Protocol for DefaultProtocol {
             Err(Error::from("response not big enough to decrypt"))
         } else {
             let result = decrypt(&mut resp.split_off(4));
-            println!("RESULT: {}", result);
             Ok(result)
         }
     }

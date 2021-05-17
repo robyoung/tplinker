@@ -2,7 +2,7 @@
 name = "tplinker"
 description = "Interface to TPLink smart devices such as HS100, HS110 and LB110"
 repository = "https://github.com/robyoung/tplinker"
-version = "0.4.2"
+version = "0.4.3"
 authors = ["Rob Young <rob@robyoung.digital>"]
 edition = "2018"
 license = "MIT"
@@ -10,8 +10,6 @@ readme = "README.md"
 keywords = ["HS100", "HS110", "LB110", "TPLink"]
 categories = ["api-bindings"]
 
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 byteorder = "1.4"
