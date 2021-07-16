@@ -717,6 +717,100 @@ pub mod tests {
       }
     }"#;
 
+    pub const LB120_JSON: &'static str = r#"{
+      "system": {
+        "get_sysinfo": {
+          "sw_ver": "1.8.11 Build 191113 Rel.105336",
+          "hw_ver": "1.0",
+          "model": "LB120(US)",
+          "description": "Smart Wi-Fi LED Bulb with Tunable White Light",
+          "alias": "Kitchen",
+          "mic_type": "IOT.SMARTBULB",
+          "dev_state": "normal",
+          "mic_mac": "000000000000",
+          "deviceId": "0000000000000000000000000000000000000000",
+          "oemId": "3444835A20788C514CB24B9F869A0A5E",
+          "hwId": "00000000000000000000000000000000",
+          "is_factory": false,
+          "disco_ver": "1.0",
+          "ctrl_protocols": {
+            "name": "Linkie",
+            "version": "1.0"
+          },
+          "light_state": {
+            "on_off": 1,
+            "mode": "normal",
+            "hue": 0,
+            "saturation": 0,
+            "color_temp": 6500,
+            "brightness": 100
+          },
+          "is_dimmable": 1,
+          "is_color": 0,
+          "is_variable_color_temp": 1,
+          "preferred_state": [
+            {
+              "index": 0,
+              "hue": 0,
+              "saturation": 0,
+              "color_temp": 3500,
+              "brightness": 100
+            },
+            {
+              "index": 1,
+              "hue": 0,
+              "saturation": 0,
+              "color_temp": 6500,
+              "brightness": 50
+            },
+            {
+              "index": 2,
+              "hue": 0,
+              "saturation": 0,
+              "color_temp": 2700,
+              "brightness": 50
+            },
+            {
+              "index": 3,
+              "hue": 0,
+              "saturation": 0,
+              "color_temp": 2700,
+              "brightness": 1
+            }
+          ],
+          "rssi": -32,
+          "active_mode": "none",
+          "heapsize": 316224,
+          "err_code": 0
+        }
+      },
+      "emeter": {
+        "err_code": -2001,
+        "err_msg": "Module not support"
+      },
+      "smartlife.iot.dimmer": {
+        "err_code": -2001,
+        "err_msg": "Module not support"
+      },
+      "smartlife.iot.common.emeter": {
+        "get_realtime": {
+          "power_mw": 10800,
+          "err_code": 0
+        }
+      },
+      "smartlife.iot.smartbulb.lightingservice": {
+        "get_light_state": {
+          "on_off": 1,
+          "mode": "normal",
+          "hue": 0,
+          "saturation": 0,
+          "color_temp": 6500,
+          "brightness": 100,
+          "err_code": 0
+        }
+      }
+    }"#;
+
     #[test]
     fn deserialise_hs100() {
         let result = serde_json::from_str::<DeviceData>(&HS100_JSON_OFF).unwrap();
@@ -801,6 +895,35 @@ pub mod tests {
                 .dft_on_state()
                 .color_temp,
             2700
+        );
+    }
+
+    #[test]
+    fn deserialise_lb120() {
+        let result = serde_json::from_str::<DeviceData>(&LB120_JSON).unwrap();
+
+        let sysinfo = result.sysinfo();
+        assert_eq!(sysinfo.hw_ver, "1.0");
+        assert_eq!(sysinfo.model, "LB120(US)");
+        assert_eq!(
+            sysinfo
+                .light_state
+                .as_ref()
+                .unwrap()
+                .dft_on_state()
+                .color_temp,
+            6500
+        );
+        let smartlife = result.smartlife;
+        assert_eq!(smartlife.emeter().unwrap().realtime.power_mw, 10800);
+        assert_eq!(
+            smartlife
+                .lightingservice()
+                .unwrap()
+                .light_state
+                .dft_on_state()
+                .color_temp,
+            6500
         );
     }
 }

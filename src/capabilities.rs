@@ -372,7 +372,7 @@ fn check_command_error(value: &serde_json::Value, pointer: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::datatypes::tests::{HS100_JSON_OFF, HS100_JSON_ON, LB110_JSON_ON};
+    use crate::datatypes::tests::{HS100_JSON_OFF, HS100_JSON_ON, LB110_JSON_ON, LB120_JSON};
     use std::cell::Cell;
 
     struct DummyDevice {
@@ -419,6 +419,7 @@ mod tests {
     impl Switch for DummyDevice {}
     impl Light for DummyDevice {}
     impl Dimmer for DummyDevice {}
+    impl ColorTemperature for DummyDevice {}
     impl Emeter for DummyDevice {}
 
     #[test]
@@ -611,6 +612,31 @@ mod tests {
         device.set_brightness(56).unwrap();
         assert_eq!(device.msgs.into_inner(), vec![
             r#"{"smartlife.iot.smartbulb.lightingservice":{"transition_light_state":{"brightness":56}}}"#.to_string(),
+        ]);
+    }
+
+    #[test]
+    fn color_temp() {
+        let device = DummyDevice::new(Ok(LB120_JSON.to_string()));
+
+        assert_eq!(device.color_temp().unwrap(), 6500);
+        assert_eq!(
+            device.msgs.into_inner(),
+            vec![
+                r#"{"smartlife.iot.smartbulb.lightingservice":{"get_light_state":null}}"#
+                    .to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn set_color_temp() {
+        let device = DummyDevice::new(Ok(LB120_JSON.to_string()));
+
+        assert!(device.set_color_temp(2699).is_err());
+        device.set_color_temp(4500).unwrap();
+        assert_eq!(device.msgs.into_inner(), vec![
+            r#"{"smartlife.iot.smartbulb.lightingservice":{"transition_light_state":{"color_temp":4500}}}"#.to_string(),
         ]);
     }
 
