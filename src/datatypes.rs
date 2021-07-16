@@ -170,7 +170,7 @@ pub struct SysInfo {
     pub children: Option<Vec<SysInfoChild>>,
     pub child_num: Option<u8>,
 
-    // LB110
+    // LB110/LB120
     pub light_state: Option<LightState>,
     pub is_dimmable: Option<u8>,
     pub is_color: Option<u8>,

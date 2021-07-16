@@ -1,13 +1,13 @@
 [package]
 name = "tplinker"
-description = "Interface to TPLink smart devices such as HS100, HS110 and LB110"
+description = "Interface to TPLink smart devices such as HS100, HS110, LB110 and LB120"
 repository = "https://github.com/robyoung/tplinker"
 version = "0.4.3"
 authors = ["Rob Young <rob@robyoung.digital>"]
 edition = "2018"
 license = "MIT"
 readme = "README.md"
-keywords = ["HS100", "HS110", "LB110", "TPLink"]
+keywords = ["HS100", "HS110", "LB110", "LB120", "TPLink"]
 categories = ["api-bindings"]
 
 
