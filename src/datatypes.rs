@@ -192,6 +192,11 @@ impl SysInfo {
             .map_or(false, |is_dimmable| is_dimmable == 1)
     }
 
+    pub fn is_variable_color_temp(&self) -> bool {
+        self.is_variable_color_temp
+            .map_or(false, |is_variable_color_temp| is_variable_color_temp == 1)
+    }
+
     pub fn is_color(&self) -> bool {
         self.is_color.map_or(false, |is_color| is_color == 1)
     }

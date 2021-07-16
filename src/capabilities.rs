@@ -208,6 +208,7 @@ pub trait Light: DeviceActions {
     ///
     /// This is a low level method, and has no validation. You should use one of the
     /// higher level methods such as [`set_brightness`](./trait.Dimmer.html#method.set_brightness)
+    /// or [`set_color_temp`](./trait.Dimmer.html#method.set_color_temp)
     /// or [`set_hsv`](./trait.Colour.html#method.set_hsv).
     fn set_light_state(&self, light_state: SetLightState) -> Result<LightState> {
         let command = json!({
@@ -238,6 +239,34 @@ pub trait Dimmer: Light {
                 saturation: None,
                 brightness: Some(brightness),
                 color_temp: None,
+            })?;
+            Ok(())
+        }
+    }
+}
+
+/// Tunable color temperature smart light devices
+pub trait ColorTemperature: Light {
+    /// Get color temperature of bulb by degrees of Kelvin
+    fn color_temp(&self) -> Result<u16> {
+        Ok(self.get_light_state()?.dft_on_state().color_temp)
+    }
+
+    /// Set color temperature of bulb
+    ///
+    /// Color temperature must be between 2700 and 6500.
+    fn set_color_temp(&self, color_temp: u16) -> Result<()> {
+        if color_temp < 2700 || color_temp > 6500 {
+            Err(Error::from(
+                "Color temperature must be between 2700 and 6500",
+            ))
+        } else {
+            self.set_light_state(SetLightState {
+                on_off: None,
+                hue: None,
+                saturation: None,
+                brightness: None,
+                color_temp: Some(color_temp),
             })?;
             Ok(())
         }
