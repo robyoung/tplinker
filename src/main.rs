@@ -6,7 +6,7 @@ use serde_json::{json, to_string as stringify, Value};
 use tplinker::{
     capabilities::{DeviceActions, MultiSwitch, Switch},
     datatypes::{DeviceData, SysInfo},
-    devices::{Device, RawDevice, HS100, HS105, HS110, HS300, LB110},
+    devices::{Device, RawDevice, HS100, HS105, HS110, HS300, LB110, LB120},
     error::Result as TpResult,
 };
 
@@ -108,6 +108,7 @@ fn command_switch_toggle(
                         toggle_multiswitch(s, state, index.unwrap())
                     }
                     Device::LB110(s) => toggle_switch(s, state),
+                    Device::LB120(s) => toggle_switch(s, state),
                     _ => panic!("not a switchable device: {}", addr),
                 }
                 .map(|_| Value::Bool(true))
@@ -156,6 +157,10 @@ fn device_from_addr(addr: SocketAddr) -> TpResult<(SocketAddr, Device, SysInfo)>
         let dev = LB110::from_raw(raw);
         let info = dev.sysinfo()?;
         (Device::LB110(dev), info)
+    } else if info.model.starts_with("LB120") {
+        let dev = LB120::from_raw(raw);
+        let info = dev.sysinfo()?;
+        (Device::LB120(dev), info)
     } else {
         (Device::Unknown(raw), info)
     };
@@ -175,6 +180,7 @@ fn device_is_on(device: &Device, index: Option<usize>) -> Option<bool> {
         Device::HS110(device) => device.is_on().ok(),
         Device::HS300(device) if index.is_some() => device.is_on(index.unwrap()).ok(),
         Device::LB110(device) => device.is_on().ok(),
+        Device::LB120(device) => device.is_on().ok(),
         _ => None,
     }
 }
@@ -409,6 +415,7 @@ impl Format {
             Device::HS110(_) => "HS110",
             Device::HS300(_) => "HS300",
             Device::LB110(_) => "LB110",
+            Device::LB120(_) => "LB120",
             Device::Unknown(_) => "unknown",
         }
     }
