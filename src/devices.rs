@@ -24,7 +24,7 @@ use serde::de::DeserializeOwned;
 
 use crate::{
     capabilities::{ColorTemperature, DeviceActions, Dimmer, Emeter, Light, MultiSwitch, Switch},
-    datatypes::DeviceData,
+    datatypes::{DeviceData, GetLightStateResult},
     error::Result,
     protocol::{DefaultProtocol, Protocol},
 };
@@ -58,8 +58,9 @@ impl RawDevice<DefaultProtocol> {
 
 impl<T: Protocol> DeviceActions for RawDevice<T> {
     fn send<'a, D: DeserializeOwned>(&self, msg: &str) -> Result<D> {
-        let message_res = &self.protocol.send(self.addr, msg)?;
-        Ok(serde_json::from_str::<D>(if message_res.len() == 0 { "{}" } else { message_res })?)
+        Ok(serde_json::from_str::<D>(
+            &self.protocol.send(self.addr, msg)?,
+        )?)
     }
 }
 
@@ -192,12 +193,12 @@ impl<T: Protocol> Switch for KL110<T> {
     }
 
     fn switch_on(&self) -> Result<()> {
-        self.send(&r#"{"smartlife.iot.smartbulb.lightingservice":{"transition_light_state":{"on_off":1}}}"#)?;
+        self.send::<GetLightStateResult>(&r#"{"smartlife.iot.smartbulb.lightingservice":{"transition_light_state":{"on_off":1}}}"#)?;
         Ok(())
     }
 
     fn switch_off(&self) -> Result<()> {
-        self.send(&r#"{"smartlife.iot.smartbulb.lightingservice":{"transition_light_state":{"on_off":0}}}"#)?;
+        self.send::<GetLightStateResult>(&r#"{"smartlife.iot.smartbulb.lightingservice":{"transition_light_state":{"on_off":0}}}"#)?;
         Ok(())
     }
 }
