@@ -58,9 +58,8 @@ impl RawDevice<DefaultProtocol> {
 
 impl<T: Protocol> DeviceActions for RawDevice<T> {
     fn send<'a, D: DeserializeOwned>(&self, msg: &str) -> Result<D> {
-        Ok(serde_json::from_str::<D>(
-            &self.protocol.send(self.addr, msg)?,
-        )?)
+        let message_res = &self.protocol.send(self.addr, msg)?;
+        Ok(serde_json::from_str::<D>(if message_res.len() == 0 { "{}" } else { message_res })?)
     }
 }
 
@@ -185,6 +184,31 @@ impl<T: Protocol> Emeter for LB120<T> {
     }
 }
 
+new_device!(KL110, "dimmable smart lightbulb");
+
+impl<T: Protocol> Switch for KL110<T> {
+    fn is_on(&self) -> Result<bool> {
+        Ok(self.get_light_state()?.on_off == 1)
+    }
+
+    fn switch_on(&self) -> Result<()> {
+        self.send(&r#"{"smartlife.iot.smartbulb.lightingservice":{"transition_light_state":{"on_off":1}}}"#)?;
+        Ok(())
+    }
+
+    fn switch_off(&self) -> Result<()> {
+        self.send(&r#"{"smartlife.iot.smartbulb.lightingservice":{"transition_light_state":{"on_off":0}}}"#)?;
+        Ok(())
+    }
+}
+impl<T: Protocol> Light for KL110<T> {}
+impl<T: Protocol> Dimmer for KL110<T> {}
+impl<T: Protocol> Emeter for KL110<T> {
+    fn emeter_type(&self) -> String {
+        String::from("smartlife.iot.common.emeter")
+    }
+}
+
 /// An enum of the available device types.
 ///
 /// This is returned from [`discover`](../discovery/fn.discover.html).
@@ -204,6 +228,8 @@ pub enum Device {
     LB110(LB110<DefaultProtocol>),
     /// Device variant for an LB120 smart light
     LB120(LB120<DefaultProtocol>),
+    /// Device variant for an KL110 smart light
+    KL110(KL110<DefaultProtocol>),
     /// Device variant for an unknown device
     Unknown(RawDevice<DefaultProtocol>),
 }
@@ -225,6 +251,8 @@ impl Device {
             Device::LB110(LB110::from_addr(addr))
         } else if model.contains("LB120") {
             Device::LB120(LB120::from_addr(addr))
+        } else if model.contains("KL110") {
+            Device::KL110(KL110::from_addr(addr))
         } else {
             Device::Unknown(RawDevice::from_addr(addr))
         }
@@ -240,6 +268,7 @@ impl DeviceActions for Device {
             Device::HS300(d) => d.send(msg),
             Device::LB110(d) => d.send(msg),
             Device::LB120(d) => d.send(msg),
+            Device::KL110(d) => d.send(msg),
             Device::Unknown(d) => d.send(msg),
         }
     }

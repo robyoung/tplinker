@@ -170,7 +170,7 @@ pub struct SysInfo {
     pub children: Option<Vec<SysInfoChild>>,
     pub child_num: Option<u8>,
 
-    // LB110/LB120
+    // LB110/LB120/KL110
     pub light_state: Option<LightState>,
     pub is_dimmable: Option<u8>,
     pub is_color: Option<u8>,
@@ -811,6 +811,192 @@ pub mod tests {
       }
     }"#;
 
+    pub const KL110_JSON_OFF: &'static str = r#"{
+      "system": {
+        "get_sysinfo": {
+          "sw_ver": "1.8.6 Build 180809 Rel.091659",
+          "hw_ver": "1.0",
+          "model": "KL110(EU)",
+          "description": "Smart Wi-Fi LED Bulb with Dimmable Light",
+          "alias": "Lamp",
+          "mic_type": "IOT.SMARTBULB",
+          "dev_state": "normal",
+          "mic_mac": "000000000000",
+          "deviceId": "0000000000000000000000000000000000000000",
+          "oemId": "A68E15472071CB761E5CCFB388A1D8AE",
+          "hwId": "00000000000000000000000000000000",
+          "is_factory": false,
+          "disco_ver": "1.0",
+          "ctrl_protocols": {
+            "name": "Linkie",
+            "version": "1.0"
+          },
+          "light_state": {
+            "on_off": 0,
+            "dft_on_state": {
+              "mode": "normal",
+              "hue": 0,
+              "saturation": 0,
+              "color_temp": 2700,
+              "brightness": 1
+            }
+          },
+          "is_dimmable": 1,
+          "is_color": 0,
+          "is_variable_color_temp": 0,
+          "preferred_state": [
+            {
+              "index": 0,
+              "hue": 0,
+              "saturation": 0,
+              "color_temp": 2700,
+              "brightness": 100
+            },
+            {
+              "index": 1,
+              "hue": 0,
+              "saturation": 0,
+              "color_temp": 2700,
+              "brightness": 80
+            },
+            {
+              "index": 2,
+              "hue": 0,
+              "saturation": 0,
+              "color_temp": 2700,
+              "brightness": 10
+            },
+            {
+              "index": 3,
+              "hue": 0,
+              "saturation": 0,
+              "color_temp": 2700,
+              "brightness": 1
+            }
+          ],
+          "rssi": -51,
+          "active_mode": "none",
+          "heapsize": 290056,
+          "err_code": 0
+        }
+      },
+      "emeter": {
+        "err_code": -2001,
+        "err_msg": "Module not support"
+      },
+      "smartlife.iot.dimmer": {
+        "err_code": -2001,
+        "err_msg": "Module not support"
+      },
+      "smartlife.iot.common.emeter": {
+        "get_realtime": {
+          "power_mw": 0,
+          "err_code": 0
+        }
+      },
+      "smartlife.iot.smartbulb.lightingservice": {
+        "get_light_state": {
+          "on_off": 0,
+          "dft_on_state": {
+            "mode": "normal",
+            "hue": 0,
+            "saturation": 0,
+            "color_temp": 2700,
+            "brightness": 1
+          },
+          "err_code": 0
+        }
+      }
+    }"#;
+
+    pub const KL110_JSON_ON: &'static str = r#"{
+        "system": {
+            "get_sysinfo": {
+                "sw_ver": "1.8.11 Build 191113 Rel.105336",
+                "hw_ver": "1.0",
+                "model": "KL110(EU)",
+                "description": "Smart Wi-Fi LED Bulb with Dimmable Light",
+                "alias": "Raktár",
+                "mic_type": "IOT.SMARTBULB",
+                "dev_state": "normal",
+                "mic_mac": "50D4F7FB4322",
+                "deviceId": "8012AE9057F11B863567258F4EE165FA1C0E6C93",
+                "oemId": "775B67C11038B99BEEDE39B0C910F6E9",
+                "hwId": "111E35908497A05512E259BB76801E10",
+                "is_factory": false,
+                "disco_ver": "1.0",
+                "ctrl_protocols": {
+                    "name": "Linkie",
+                    "version": "1.0"
+                },
+                "light_state": {
+                    "on_off": 1,
+                    "mode": "normal",
+                    "hue": 0,
+                    "saturation": 0,
+                    "color_temp": 2700,
+                    "brightness": 100
+                },
+                "is_dimmable": 1,
+                "is_color": 0,
+                "is_variable_color_temp": 0,
+                "preferred_state": [{
+                    "index": 0,
+                    "hue": 0,
+                    "saturation": 0,
+                    "color_temp": 2700,
+                    "brightness": 100
+                }, {
+                    "index": 1,
+                    "hue": 0,
+                    "saturation": 0,
+                    "color_temp": 2700,
+                    "brightness": 75
+                }, {
+                    "index": 2,
+                    "hue": 0,
+                    "saturation": 0,
+                    "color_temp": 2700,
+                    "brightness": 25
+                }, {
+                    "index": 3,
+                    "hue": 0,
+                    "saturation": 0,
+                    "color_temp": 2700,
+                    "brightness": 1
+                }],
+                "rssi": -43,
+                "active_mode": "none",
+                "heapsize": 291180,
+                "err_code": 0
+            }
+        },
+        "emeter": {
+            "err_code": -2001,
+            "err_msg": "Module not support"
+        },
+        "smartlife.iot.dimmer": {
+            "err_code": -2001,
+            "err_msg": "Module not support"
+        },
+        "smartlife.iot.common.emeter": {
+            "get_realtime": {
+                "power_mw": 10800,
+                "err_code": 0
+            }
+        },
+        "smartlife.iot.smartbulb.lightingservice": {
+            "get_light_state": {
+                "on_off": 1,
+                "mode": "normal",
+                "hue": 0,
+                "saturation": 0,
+                "color_temp": 2700,
+                "brightness": 100,
+                "err_code": 0
+            }
+        }
+    }"#;
     #[test]
     fn deserialise_hs100() {
         let result = serde_json::from_str::<DeviceData>(&HS100_JSON_OFF).unwrap();
@@ -924,6 +1110,63 @@ pub mod tests {
                 .dft_on_state()
                 .color_temp,
             6500
+        );
+    }
+    #[test]
+    fn deserialise_kl110_off() {
+        let result = serde_json::from_str::<DeviceData>(&KL110_JSON_OFF).unwrap();
+
+        let sysinfo = result.sysinfo();
+        assert_eq!(sysinfo.hw_ver, "1.0");
+        assert_eq!(sysinfo.model, "KL110(EU)");
+        assert_eq!(
+            sysinfo
+                .light_state
+                .as_ref()
+                .unwrap()
+                .dft_on_state()
+                .color_temp,
+            2700
+        );
+        let smartlife = result.smartlife;
+        assert_eq!(smartlife.emeter().unwrap().realtime.power_mw, 0);
+        assert_eq!(
+            smartlife
+                .lightingservice()
+                .unwrap()
+                .light_state
+                .dft_on_state()
+                .color_temp,
+            2700
+        );
+    }
+
+    #[test]
+    fn deserialise_kl110_on() {
+        let result = serde_json::from_str::<DeviceData>(&KL110_JSON_ON).unwrap();
+
+        let sysinfo = result.sysinfo();
+        assert_eq!(sysinfo.hw_ver, "1.0");
+        assert_eq!(sysinfo.model, "KL110(EU)");
+        assert_eq!(
+            sysinfo
+                .light_state
+                .as_ref()
+                .unwrap()
+                .dft_on_state()
+                .color_temp,
+            2700
+        );
+        let smartlife = result.smartlife;
+        assert_eq!(smartlife.emeter().unwrap().realtime.power_mw, 10800);
+        assert_eq!(
+            smartlife
+                .lightingservice()
+                .unwrap()
+                .light_state
+                .dft_on_state()
+                .color_temp,
+            2700
         );
     }
 }
