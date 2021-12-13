@@ -1,6 +1,6 @@
 //! A library to query and control `TPLink` smart devices on the local network.
 //!
-//! Supported devices include HS100, HS110, LB110, LB120.
+//! Supported devices include HS100, HS110, LB110, LB120, KL110.
 //!
 //! Inspired and influenced by [`pyHS100`](https://github.com/GadgetReactor/pyHS100) and
 //! [hs100api](https://github.com/abronan/hs100-rust-api).
