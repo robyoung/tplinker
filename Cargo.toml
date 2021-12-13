@@ -7,7 +7,7 @@ authors = ["Rob Young <rob@robyoung.digital>"]
 edition = "2018"
 license = "MIT"
 readme = "README.md"
-keywords = ["HS100", "HS110", "LB110", "LB120", "KL110", "TPLink"]
+keywords = ["TPLink"]
 categories = ["api-bindings"]
 
 
