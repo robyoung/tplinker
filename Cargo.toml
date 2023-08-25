@@ -1,6 +1,6 @@
 [package]
 name = "tplinker"
-description = "Interface to TPLink smart devices such as HS100, HS110, LB110, LB120, KL110"
+description = "Interface to TPLink smart devices such as HS100, HS110, LB110, LB120, KL110, KP115"
 repository = "https://github.com/robyoung/tplinker"
 version = "0.4.4"
 authors = ["Rob Young <rob@robyoung.digital>"]

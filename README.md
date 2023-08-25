@@ -14,7 +14,7 @@
 
 A rust library to query and control TPLink smart plugs and smart lights.
 
-Supported devices include HS100, HS110, LB110, LB120, KL110.
+Supported devices include HS100, HS110, LB110, LB120, KL110, KP115.
 
 Inspired and influenced by [pyHS100](https://github.com/GadgetReactor/pyHS100) and
 [hs100api](https://github.com/abronan/hs100-rust-api).
