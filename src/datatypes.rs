@@ -997,6 +997,62 @@ pub mod tests {
             }
         }
     }"#;
+
+    pub const KP115_JSON: &'static str = r#"{
+      "emeter": {
+        "get_realtime": {
+          "current_ma": 19,
+          "err_code": 0,
+          "power_mw": 1742,
+          "total_wh": 9064,
+          "voltage_mv": 235437
+        }
+      },
+      "smartlife.iot.common.emeter": {
+        "err_code": -1,
+        "err_msg": "module not support"
+      },
+      "smartlife.iot.dimmer": {
+        "err_code": -1,
+        "err_msg": "module not support"
+      },
+      "smartlife.iot.smartbulb.lightingservice": {
+        "err_code": -1,
+        "err_msg": "module not support"
+      },
+      "system": {
+        "get_sysinfo": {
+          "active_mode": "none",
+          "alias": "AC",
+          "dev_name": "Smart Wi-Fi Plug Mini",
+          "deviceId": "xxxxx",
+          "err_code": 0,
+          "feature": "TIM:ENE",
+          "hwId": "xxxxx",
+          "hw_ver": "1.0",
+          "icon_hash": "",
+          "latitude_i": 50,
+          "led_off": 0,
+          "longitude_i": -2,
+          "mac": "48:xxxxxx",
+          "mic_type": "IOT.SMARTPLUGSWITCH",
+          "model": "KP115(UK)",
+          "next_action": {
+            "type": -1
+          },
+          "ntc_state": 0,
+          "obd_src": "tplink",
+          "oemId": "xxxxxx",
+          "on_time": 45335,
+          "relay_state": 1,
+          "rssi": -57,
+          "status": "new",
+          "sw_ver": "1.0.20 Build 221125 Rel.092759",
+          "updating": 0
+        }
+      }
+    }"#;
+
     #[test]
     fn deserialise_hs100() {
         let result = serde_json::from_str::<DeviceData>(&HS100_JSON_OFF).unwrap();
@@ -1168,5 +1224,14 @@ pub mod tests {
                 .color_temp,
             2700
         );
+    }
+
+    #[test]
+    fn deserialise_kp115() {
+        let result = serde_json::from_str::<DeviceData>(&KP115_JSON).unwrap();
+
+        let sysinfo = result.sysinfo();
+        assert_eq!(sysinfo.hw_ver, "1.0");
+        assert_eq!(sysinfo.model, "KP115(UK)");
     }
 }
