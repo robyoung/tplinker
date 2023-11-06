@@ -423,6 +423,7 @@ impl Format {
             Device::LB110(_) => "LB110",
             Device::LB120(_) => "LB120",
             Device::KL110(_) => "KL110",
+            Device::KP115(_) => "KP115",
             Device::Unknown(_) => "unknown",
         }
     }
