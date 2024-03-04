@@ -120,6 +120,10 @@ new_device!(HS100, "smart plug");
 
 impl<T: Protocol> Switch for HS100<T> {}
 
+new_device!(HS103, "smart plug");
+
+impl<T: Protocol> Switch for HS103<T> {}
+
 new_device!(HS105, "smart plug mini");
 
 impl<T: Protocol> Switch for HS105<T> {}
@@ -224,6 +228,8 @@ impl<T: Protocol> Emeter for KL110<T> {
 pub enum Device {
     /// Device variant for an HS100 smart plug
     HS100(HS100<DefaultProtocol>),
+    /// Device variant for an HS103 smart plug
+    HS103(HS103<DefaultProtocol>),
     /// Device variant for an HS105 smart plug
     HS105(HS105<DefaultProtocol>),
     /// Device variant for an HS110 smart plug
@@ -249,6 +255,8 @@ impl Device {
         let model = &device_data.sysinfo().model;
         if model.contains("HS100") {
             Device::HS100(HS100::from_addr(addr))
+        } else if model.contains("HS103") {
+            Device::HS103(HS103::from_addr(addr))
         } else if model.contains("HS105") {
             Device::HS105(HS105::from_addr(addr))
         } else if model.contains("HS110") {
@@ -273,6 +281,7 @@ impl DeviceActions for Device {
     fn send<D: DeserializeOwned>(&self, msg: &str) -> Result<D> {
         match self {
             Device::HS100(d) => d.send(msg),
+            Device::HS103(d) => d.send(msg),
             Device::HS105(d) => d.send(msg),
             Device::HS110(d) => d.send(msg),
             Device::HS300(d) => d.send(msg),
